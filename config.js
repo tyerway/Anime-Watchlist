@@ -3,5 +3,5 @@
 // Contoh: "https://anime-api.nama-kamu.workers.dev"
 // Kosongkan jika belum memasang penghubung; situs memakai data.js dan halaman Tambah anime dinonaktifkan.
 window.SITE_CONFIG = {
-  apiUrl: ""
+  apiUrl: "https://anime-api.tyerway.workers.dev"
 };
