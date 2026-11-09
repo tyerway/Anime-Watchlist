@@ -271,7 +271,35 @@
   }
 
   // ---------- Tambah anime ----------
-  // Pencarian lewat penghubung (server yang memanggil Jikan), bukan langsung dari browser.
+  // Cadangan: jika penghubung gagal menjangkau sumber data, coba AniList langsung dari browser.
+  const ANILIST_TYPE = { TV: 'TV', TV_SHORT: 'TV', MOVIE: 'Movie', SPECIAL: 'Special', OVA: 'OVA', ONA: 'ONA', MUSIC: 'Music' };
+  async function searchAniListBrowser(query) {
+    const gql = `query ($q: String) { Page(perPage: 10) { media(search: $q, type: ANIME, sort: SEARCH_MATCH) {
+      idMal format episodes seasonYear description(asHtml: false) genres title { english romaji }
+      coverImage { extraLarge large } studios(isMain: true) { nodes { name } } } } }`;
+    const res = await fetch('https://graphql.anilist.co', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ query: gql, variables: { q: query } }),
+    });
+    if (!res.ok) throw new Error('AniList membalas kode ' + res.status);
+    const media = (await res.json())?.data?.Page?.media;
+    if (!Array.isArray(media)) throw new Error('format balasan tidak dikenal');
+    const clean = (t) => (t || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/\s*\(Source:[^)]*\)\s*$/i, '').trim() || null;
+    return media.filter((m) => m.idMal).map((m) => ({
+      malId: m.idMal,
+      judul: m.title.english || m.title.romaji,
+      tipe: ANILIST_TYPE[m.format] || null,
+      tahun: m.seasonYear || null,
+      total: m.episodes ?? null,
+      studio: (m.studios && m.studios.nodes[0] && m.studios.nodes[0].name) || null,
+      genre: (m.genres || []).slice(0, 6),
+      sinopsis: clean(m.description),
+      cover: (m.coverImage && (m.coverImage.extraLarge || m.coverImage.large)) || null,
+    }));
+  }
+
+  // Pencarian lewat penghubung (server yang memanggil sumber data), dengan cadangan lewat browser.
   async function searchAnime(query, api, password) {
     let res;
     try {
@@ -280,8 +308,11 @@
       throw new Error('Tidak bisa terhubung ke penghubung. Periksa apiUrl di config.js dan koneksi internetmu.');
     }
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || `Pencarian gagal (kode ${res.status}).`);
-    return data.results || [];
+    if (res.ok) return data.results || [];
+    if (res.status === 502 || res.status === 503 || res.status === 504) {
+      try { return await searchAniListBrowser(query); } catch { /* pakai pesan dari penghubung */ }
+    }
+    throw new Error(data.error || `Pencarian gagal (kode ${res.status}).`);
   }
 
   function add() {
