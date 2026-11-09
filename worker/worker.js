@@ -3,6 +3,7 @@
 // Endpoint:
 //   GET  /api/anime  -> daftar anime dari Notion (terbuka, sama dengan isi situs publik)
 //   POST /api/anime  -> menambah anime ke Notion (wajib header X-Admin-Password)
+//   GET  /api/cari?q=judul -> mencari di MyAnimeList lewat Jikan (wajib header X-Admin-Password)
 //
 // Pengaturan (Workers > Settings > Variables and Secrets):
 //   NOTION_TOKEN        (Secret)   token integrasi Notion
@@ -191,7 +192,7 @@ async function listAnime(request, env) {
   return reply({ items, diperbarui: new Date().toISOString() }, 200, request, env);
 }
 
-async function addAnime(request, env) {
+async function requirePassword(request, env) {
   if (!env.ADMIN_PASSWORD) {
     throw new HttpError(500, 'Kata sandi admin belum diatur di penghubung (ADMIN_PASSWORD).');
   }
@@ -200,6 +201,10 @@ async function addAnime(request, env) {
     await new Promise((r) => setTimeout(r, 400)); // memperlambat tebak-tebakan
     throw new HttpError(401, 'Kata sandi salah.');
   }
+}
+
+async function addAnime(request, env) {
+  await requirePassword(request, env);
 
   const raw = await request.text();
   if (raw.length > MAX_BODY) throw new HttpError(413, 'Data terlalu besar.');
@@ -223,6 +228,40 @@ async function addAnime(request, env) {
   return reply({ item }, 201, request, env);
 }
 
+// Pencarian MyAnimeList lewat Jikan. Dipanggil dari server supaya tidak bergantung pada jaringan atau ekstensi browser.
+async function searchAnime(request, env, url) {
+  await requirePassword(request, env);
+  const q = (url.searchParams.get('q') || '').trim().slice(0, 100);
+  if (q.length < 2) throw new HttpError(400, 'Ketik minimal 2 huruf.');
+
+  let res;
+  try {
+    res = await fetch(`https://api.jikan.moe/v4/anime?q=${encodeURIComponent(q)}&limit=10&sfw=true`, {
+      headers: { Accept: 'application/json', 'User-Agent': 'watchlist-anime-penghubung' },
+      signal: AbortSignal.timeout(10000),
+      cf: { cacheTtl: 3600, cacheEverything: true },
+    });
+  } catch {
+    throw new HttpError(504, 'MyAnimeList (Jikan) tidak merespons. Coba lagi sebentar.');
+  }
+  if (res.status === 429) throw new HttpError(503, 'Terlalu banyak permintaan ke MyAnimeList. Tunggu sebentar lalu coba lagi.');
+  if (!res.ok) throw new HttpError(502, `MyAnimeList tidak bisa dihubungi (kode ${res.status}).`);
+
+  const json = await res.json();
+  const results = (json.data || []).map((a) => ({
+    malId: a.mal_id,
+    judul: a.title_english || a.title,
+    tipe: a.type || null,
+    tahun: a.year || null,
+    total: a.episodes ?? null,
+    studio: a.studios && a.studios[0] ? a.studios[0].name : null,
+    genre: (a.genres || []).map((g) => g.name).slice(0, 6),
+    sinopsis: (a.synopsis || '').replace(/\s*\[Written by[^\]]*\]\s*$/, '').trim() || null,
+    cover: (a.images && a.images.jpg && (a.images.jpg.large_image_url || a.images.jpg.image_url)) || null,
+  }));
+  return reply({ results }, 200, request, env);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -232,6 +271,9 @@ export default {
       }
       if (url.pathname === '/' && request.method === 'GET') {
         return reply({ ok: true, layanan: 'penghubung watchlist anime' }, 200, request, env);
+      }
+      if (url.pathname === '/api/cari' && request.method === 'GET') {
+        return await searchAnime(request, env, url);
       }
       if (url.pathname === '/api/anime') {
         if (!env.NOTION_TOKEN || !env.NOTION_DATABASE_ID) {
