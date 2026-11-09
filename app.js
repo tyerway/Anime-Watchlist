@@ -244,10 +244,95 @@
     }
     document.title = a.judul + ' | Watchlist Anime';
 
-    const ticks = a.total && a.total <= 100
-      ? h('div', { class: 'ticks', role: 'img', 'aria-label': `${a.ep} dari ${a.total} episode sudah ditonton` },
-          Array.from({ length: a.total }, (_, i) => h('span', { class: i < a.ep ? 'tick on' : 'tick' })))
-      : null;
+    const api = apiBase();
+    const canEdit = !!(api && a.notionId);
+
+    const panel = h('div', { class: 'panel' });
+    const say = h('p', { class: 'msg', role: 'status' });
+    const notify = (text, kind = '') => { say.textContent = text; say.className = ('msg ' + kind).trim(); };
+
+    let saved = '';
+    try { saved = localStorage.getItem(PW_KEY) || ''; } catch { /* penyimpanan diblokir */ }
+    const pw = h('input', { type: 'password', id: 'pw', autocomplete: 'current-password', value: saved });
+    const remember = h('input', { type: 'checkbox', id: 'remember', checked: saved ? true : null });
+    let busy = false;
+
+    // Status ikut menyesuaikan progres, supaya tidak perlu diubah manual di Notion.
+    function statusFor(ep) {
+      if (a.total && ep >= a.total) return 'selesai';
+      if (ep > 0 && (a.status === 'rencana' || a.status === 'selesai')) return 'ditonton';
+      return a.status;
+    }
+
+    async function setProgress(target) {
+      if (busy) return;
+      const ep = Math.max(0, a.total ? Math.min(a.total, target) : target);
+      if (ep === a.ep) return;
+      if (!pw.value) { notify('Isi kata sandi dulu untuk mengubah progres.', 'err'); pw.focus(); return; }
+      busy = true; draw(); notify('Menyimpan ke Notion...');
+      try {
+        let res;
+        try {
+          res = await fetch(api + '/api/anime', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'X-Admin-Password': pw.value },
+            body: JSON.stringify({ notionId: a.notionId, ep, status: statusFor(ep) }),
+          });
+        } catch {
+          throw new Error('Tidak bisa terhubung ke penghubung. Periksa koneksi internetmu.');
+        }
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `Gagal menyimpan (kode ${res.status}).`);
+        a.ep = data.item.ep; a.status = data.item.status;
+        const src = (window.ANIME || []).find((x) => x.notionId === a.notionId);
+        if (src) { src.ep = a.ep; src.status = a.status; }
+        try {
+          if (remember.checked) localStorage.setItem(PW_KEY, pw.value);
+          else localStorage.removeItem(PW_KEY);
+        } catch { /* abaikan */ }
+        notify(a.status === 'selesai' ? 'Tersimpan. Selesai ditonton!' : `Tersimpan: episode ${a.ep}.`, 'ok');
+      } catch (err) {
+        notify(err.message, 'err');
+      } finally {
+        busy = false; draw();
+      }
+    }
+
+    function draw() {
+      const ticks = a.total && a.total <= 100
+        ? h('div', canEdit
+            ? { class: 'ticks', role: 'group', 'aria-label': 'Pilih episode terakhir yang sudah ditonton' }
+            : { class: 'ticks', role: 'img', 'aria-label': `${a.ep} dari ${a.total} episode sudah ditonton` },
+          Array.from({ length: a.total }, (_, i) => {
+            const n = i + 1;
+            const cls = n <= a.ep ? 'tick on' : 'tick';
+            if (!canEdit) return h('span', { class: cls });
+            return h('button', {
+              type: 'button', class: cls, disabled: busy ? true : null,
+              title: `Episode ${n}`, 'aria-label': n === a.ep ? `Batalkan episode ${n}` : `Tandai sampai episode ${n}`,
+              onclick: () => setProgress(n === a.ep ? n - 1 : n),
+            });
+          }))
+        : null;
+
+      const controls = canEdit ? h('div', { class: 'controls' },
+        h('button', { type: 'button', class: 'btn', disabled: busy || a.ep <= 0 ? true : null, text: '\u22121 episode', onclick: () => setProgress(a.ep - 1) }),
+        h('button', { type: 'button', class: 'btn primary', disabled: busy || (a.total && a.ep >= a.total) ? true : null, text: '+1 episode', onclick: () => setProgress(a.ep + 1) })) : null;
+
+      const pwRow = canEdit ? h('div', { class: 'progress-pw' },
+        h('label', { class: 'field', for: 'pw' }, h('span', { text: 'Kata sandi (untuk mengubah progres)' }), pw),
+        h('label', { class: 'check', for: 'remember' }, remember, h('span', { text: 'Ingat kata sandi di perangkat ini' }))) : null;
+
+      panel.replaceChildren(...[
+        h('h2', { text: STATUS[a.status] }),
+        h('p', { class: 'big-count' }, String(a.ep), h('span', { text: a.total ? ' / ' + a.total + ' episode' : ' episode' })),
+        ticks, controls,
+        canEdit ? say : null,
+        pwRow,
+        canEdit ? null : h('p', { class: 'note', text: 'Progres diubah lewat Notion dan muncul di sini setelah data dimuat ulang.' }),
+      ].filter(Boolean));
+    }
+    draw();
 
     app.append(h('section', { class: 'wrap' },
       h('a', { class: 'back', href: 'daftar.html', text: 'Kembali ke semua anime' }),
@@ -262,11 +347,7 @@
             a.rating ? h('span', { text: 'Rating kamu ' + a.rating + '/10' }) : null),
           chipRow(a.genre),
           h('p', { class: a.sinopsis ? 'syn-full' : 'syn-full muted', text: a.sinopsis || 'Belum ada sinopsis. Isi kolom Sinopsis di Notion.' }),
-          h('div', { class: 'panel' },
-            h('h2', { text: STATUS[a.status] }),
-            h('p', { class: 'big-count' }, String(a.ep), h('span', { text: a.total ? ' / ' + a.total + ' episode' : ' episode' })),
-            ticks,
-            h('p', { class: 'note', text: 'Progres diubah lewat Notion dan muncul di sini setelah data dimuat ulang.' })),
+          panel,
           a.mal ? h('a', { class: 'btn', href: a.mal, target: '_blank', rel: 'noopener', text: 'Buka di MyAnimeList' }) : null))));
   }
 
