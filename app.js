@@ -352,7 +352,7 @@
       }
     }
 
-    // --- Pencarian MyAnimeList ---
+    // --- Pencarian anime ---
     const results = h('div', { class: 'results' });
     const q = h('input', { type: 'search', id: 'q', placeholder: 'Ketik judul anime', autocomplete: 'off' });
     const existingIds = () => new Set(items().map((a) => ((a.mal || '').match(/anime\/(\d+)/) || [])[1]).filter(Boolean));
@@ -380,7 +380,7 @@
     async function doSearch() {
       const term = q.value.trim();
       if (term.length < 2) { notify('Ketik minimal 2 huruf untuk mencari.', 'err'); return; }
-      notify('Mencari di MyAnimeList...');
+      notify('Mencari anime...');
       results.replaceChildren();
       try {
         const list = await searchAnime(term, api, pw.value);
@@ -425,7 +425,7 @@
           h('label', { class: 'check', for: 'remember' }, remember, 'Ingat kata sandi di perangkat ini')),
         h('div', { class: 'panel' },
           h('div', { class: 'add-search' },
-            h('label', { class: 'field grow', for: 'q' }, h('span', { text: 'Cari di MyAnimeList' }), q),
+            h('label', { class: 'field grow', for: 'q' }, h('span', { text: 'Cari anime' }), q),
             h('button', { type: 'button', class: 'btn primary', text: 'Cari', onclick: doSearch }))),
         say,
         results,
