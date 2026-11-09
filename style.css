@@ -140,3 +140,12 @@ details.panel summary { cursor: pointer; font-weight: 500; }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn:disabled:hover { border-color: var(--line); }
 .btn.primary:disabled:hover { border-color: var(--sakura); }
+
+/* Progres yang bisa diklik */
+button.tick { padding: 0; cursor: pointer; font: inherit; }
+button.tick:hover:not(:disabled) { border-color: var(--sakura); }
+button.tick:disabled { cursor: progress; opacity: .6; }
+.progress-pw { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); max-width: 360px; }
+.progress-pw .field { margin-bottom: 4px; }
+.progress-pw .check { margin-top: 6px; }
+.panel .msg { margin: 12px 0 0; }
