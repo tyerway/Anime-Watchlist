@@ -264,11 +264,10 @@
       return a.status;
     }
 
-    async function setProgress(target) {
+    // Kirim perubahan ke penghubung (PATCH). `patch` berisi ep dan/atau status.
+    async function save(patch) {
       if (busy) return;
-      const ep = Math.max(0, a.total ? Math.min(a.total, target) : target);
-      if (ep === a.ep) return;
-      if (!pw.value) { notify('Isi kata sandi dulu untuk mengubah progres.', 'err'); pw.focus(); return; }
+      if (!pw.value) { notify('Isi kata sandi dulu untuk mengubah data.', 'err'); pw.focus(); return; }
       busy = true; draw(); notify('Menyimpan ke Notion...');
       try {
         let res;
@@ -276,7 +275,7 @@
           res = await fetch(api + '/api/anime', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json', 'X-Admin-Password': pw.value },
-            body: JSON.stringify({ notionId: a.notionId, ep, status: statusFor(ep) }),
+            body: JSON.stringify({ notionId: a.notionId, ...patch }),
           });
         } catch {
           throw new Error('Tidak bisa terhubung ke penghubung. Periksa koneksi internetmu.');
@@ -286,15 +285,57 @@
         a.ep = data.item.ep; a.status = data.item.status;
         const src = (window.ANIME || []).find((x) => x.notionId === a.notionId);
         if (src) { src.ep = a.ep; src.status = a.status; }
-        try {
-          if (remember.checked) localStorage.setItem(PW_KEY, pw.value);
-          else localStorage.removeItem(PW_KEY);
-        } catch { /* abaikan */ }
-        notify(a.status === 'selesai' ? 'Tersimpan. Selesai ditonton!' : `Tersimpan: episode ${a.ep}.`, 'ok');
+        rememberPw();
+        notify(a.status === 'selesai' ? 'Tersimpan. Selesai ditonton!' : `Tersimpan: ${STATUS[a.status]}, episode ${a.ep}.`, 'ok');
       } catch (err) {
         notify(err.message, 'err');
       } finally {
         busy = false; draw();
+      }
+    }
+
+    function rememberPw() {
+      try {
+        if (remember.checked) localStorage.setItem(PW_KEY, pw.value);
+        else localStorage.removeItem(PW_KEY);
+      } catch { /* abaikan */ }
+    }
+
+    function setProgress(target) {
+      const ep = Math.max(0, a.total ? Math.min(a.total, target) : target);
+      if (ep === a.ep) return;
+      save({ ep, status: statusFor(ep) });
+    }
+
+    // Pilih status sendiri (mis. Ditunda, Dihentikan). "Selesai" sekalian menandai semua episode.
+    function setStatus(status) {
+      if (status === a.status) return;
+      save(status === 'selesai' && a.total ? { status, ep: a.total } : { status });
+    }
+
+    async function removeAnime() {
+      if (busy) return;
+      if (!pw.value) { notify('Isi kata sandi dulu untuk menghapus.', 'err'); pw.focus(); return; }
+      if (!window.confirm(`Hapus "${a.judul}" dari daftar?\n\nAnime ini dipindahkan ke tempat sampah Notion, jadi masih bisa dipulihkan dari sana.`)) return;
+      busy = true; draw(); notify('Menghapus...');
+      try {
+        let res;
+        try {
+          res = await fetch(api + '/api/anime', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json', 'X-Admin-Password': pw.value },
+            body: JSON.stringify({ notionId: a.notionId }),
+          });
+        } catch {
+          throw new Error('Tidak bisa terhubung ke penghubung. Periksa koneksi internetmu.');
+        }
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || `Gagal menghapus (kode ${res.status}).`);
+        rememberPw();
+        window.ANIME = (window.ANIME || []).filter((x) => x.notionId !== a.notionId);
+        location.href = 'daftar.html';
+      } catch (err) {
+        busy = false; draw(); notify(err.message, 'err');
       }
     }
 
@@ -319,16 +360,24 @@
         h('button', { type: 'button', class: 'btn', disabled: busy || a.ep <= 0 ? true : null, text: '\u22121 episode', onclick: () => setProgress(a.ep - 1) }),
         h('button', { type: 'button', class: 'btn primary', disabled: busy || (a.total && a.ep >= a.total) ? true : null, text: '+1 episode', onclick: () => setProgress(a.ep + 1) })) : null;
 
+      const statusRow = canEdit ? h('label', { class: 'field status-set', for: 'status-set' },
+        h('span', { text: 'Status' }),
+        h('select', { id: 'status-set', disabled: busy ? true : null, onchange: (e) => setStatus(e.target.value) },
+          Object.entries(STATUS).map(([k, v]) => h('option', { value: k, text: v, selected: k === a.status ? true : null })))) : null;
+
       const pwRow = canEdit ? h('div', { class: 'progress-pw' },
         h('label', { class: 'field', for: 'pw' }, h('span', { text: 'Kata sandi (untuk mengubah progres)' }), pw),
         h('label', { class: 'check', for: 'remember' }, remember, h('span', { text: 'Ingat kata sandi di perangkat ini' }))) : null;
 
+      const removeRow = canEdit ? h('div', { class: 'danger-zone' },
+        h('button', { type: 'button', class: 'btn danger', disabled: busy ? true : null, text: 'Hapus dari daftar', onclick: removeAnime })) : null;
+
       panel.replaceChildren(...[
         h('h2', { text: STATUS[a.status] }),
         h('p', { class: 'big-count' }, String(a.ep), h('span', { text: a.total ? ' / ' + a.total + ' episode' : ' episode' })),
-        ticks, controls,
+        ticks, controls, statusRow,
         canEdit ? say : null,
-        pwRow,
+        pwRow, removeRow,
         canEdit ? null : h('p', { class: 'note', text: 'Progres diubah lewat Notion dan muncul di sini setelah data dimuat ulang.' }),
       ].filter(Boolean));
     }
