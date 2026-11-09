@@ -271,27 +271,17 @@
   }
 
   // ---------- Tambah anime ----------
-  async function searchJikan(query) {
+  // Pencarian lewat penghubung (server yang memanggil Jikan), bukan langsung dari browser.
+  async function searchAnime(query, api, password) {
     let res;
     try {
-      res = await fetch('https://api.jikan.moe/v4/anime?q=' + encodeURIComponent(query) + '&limit=10&sfw=true');
+      res = await fetch(api + '/api/cari?q=' + encodeURIComponent(query), { headers: { 'X-Admin-Password': password } });
     } catch {
-      throw new Error('Tidak bisa menghubungi MyAnimeList. Periksa koneksi internetmu.');
+      throw new Error('Tidak bisa terhubung ke penghubung. Periksa apiUrl di config.js dan koneksi internetmu.');
     }
-    if (res.status === 429) throw new Error('Terlalu banyak permintaan ke MyAnimeList. Tunggu sebentar lalu coba lagi.');
-    if (!res.ok) throw new Error(`MyAnimeList tidak bisa dihubungi (kode ${res.status}).`);
-    const json = await res.json();
-    return (json.data || []).map((a) => ({
-      malId: a.mal_id,
-      judul: a.title_english || a.title,
-      tipe: a.type || null,
-      tahun: a.year || null,
-      total: a.episodes ?? null,
-      studio: a.studios && a.studios[0] ? a.studios[0].name : null,
-      genre: (a.genres || []).map((g) => g.name).slice(0, 6),
-      sinopsis: (a.synopsis || '').replace(/\s*\[Written by[^\]]*\]\s*$/, '').trim() || null,
-      cover: (a.images && a.images.jpg && (a.images.jpg.large_image_url || a.images.jpg.image_url)) || null,
-    }));
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Pencarian gagal (kode ${res.status}).`);
+    return data.results || [];
   }
 
   function add() {
@@ -393,7 +383,7 @@
       notify('Mencari di MyAnimeList...');
       results.replaceChildren();
       try {
-        const list = await searchJikan(term);
+        const list = await searchAnime(term, api, pw.value);
         notify(list.length ? '' : 'Tidak ada hasil. Coba judul lain atau tambah manual di bawah.');
         renderResults(list);
       } catch (err) {
