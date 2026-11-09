@@ -149,3 +149,9 @@ button.tick:disabled { cursor: progress; opacity: .6; }
 .progress-pw .field { margin-bottom: 4px; }
 .progress-pw .check { margin-top: 6px; }
 .panel .msg { margin: 12px 0 0; }
+
+.status-set { margin-top: 16px; max-width: 260px; margin-bottom: 0; }
+.status-set select { width: 100%; }
+.danger-zone { margin-top: 18px; }
+.btn.danger { background: none; border-color: #6b2b3a; color: #ff9aa8; }
+.btn.danger:hover:not(:disabled) { border-color: #ff9aa8; background: rgba(255, 154, 168, .08); }
