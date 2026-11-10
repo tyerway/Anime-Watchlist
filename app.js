@@ -7,6 +7,12 @@
     dihentikan: 'Dihentikan',
   };
   const ORDER = ['ditonton', 'rencana', 'ditunda', 'selesai', 'dihentikan'];
+  const JENIS = { anime: 'Anime', film: 'Film', serial: 'Serial Drama', game: 'Game' };
+  const PLATFORM = ['PS1', 'PS2', 'PS3', 'PS4', 'PS5', 'PSP', 'PS Vita', 'PC', 'Switch', 'Xbox', 'Mobile', 'Lainnya'];
+  const hasEpisodes = (a) => a.jenis === 'anime' || a.jenis === 'serial';   // film dan game: hanya status
+  // Game memakai kata sendiri untuk status.
+  const statusLabel = (st, jenis) => (jenis === 'game' ? { ditonton: 'Sedang Dimainkan', selesai: 'Tamat' }[st] : null) || STATUS[st];
+  const ASAL = ['Barat', 'Jepang', 'Korea', 'Lainnya'];
   const PW_KEY = 'anime-admin-pw';
   const apiBase = () => ((window.SITE_CONFIG || {}).apiUrl || '').trim().replace(/\/+$/, '');
 
@@ -34,6 +40,9 @@
     return (window.ANIME || []).map((a) => ({
       ...a,
       status: STATUS[a.status] ? a.status : 'rencana',
+      jenis: JENIS[a.jenis] ? a.jenis : 'anime',
+      asal: a.asal || null,
+      platform: a.platform || null,
       ep: a.ep || 0,
       total: a.total ?? null,
       rating: a.rating ?? null,
@@ -80,12 +89,17 @@
     return box;
   }
 
-  function facts(a) {
+  function facts(a, extra = []) {
+    const jenis = JENIS[a.jenis] ? a.jenis : 'anime';
     return h('div', { class: 'facts' },
-      a.tipe ? h('span', { text: a.tipe }) : null,
+      h('span', { class: 'jenis', text: JENIS[jenis] }),
+      a.asal && jenis !== 'game' && !(jenis === 'anime' && a.asal === 'Jepang') ? h('span', { text: a.asal }) : null,
+      jenis === 'game' && a.platform ? h('span', { text: a.platform }) : null,
+      jenis === 'anime' && a.tipe ? h('span', { text: a.tipe }) : null,
       a.tahun ? h('span', { text: String(a.tahun) }) : null,
-      a.total ? h('span', { text: a.total + ' episode' }) : null,
-      a.studio ? h('span', { text: a.studio }) : null);
+      (jenis === 'anime' || jenis === 'serial') && a.total ? h('span', { text: a.total + ' episode' }) : null,
+      a.studio ? h('span', { text: a.studio }) : null,
+      extra);
   }
 
   function chipRow(genre) {
@@ -94,12 +108,12 @@
 
   function progress(a) {
     const pct = a.total ? Math.min(100, Math.round((a.ep / a.total) * 100)) : 0;
-    if (a.status === 'ditonton' || a.status === 'selesai') {
+    if ((a.status === 'ditonton' || a.status === 'selesai') && hasEpisodes(a)) {
       return h('div', { class: 'prog' },
         h('div', { class: 'bar' }, h('i', { style: `width:${pct}%` })),
         h('span', { text: `Ep ${a.ep}${a.total ? ' / ' + a.total : ''}` }));
     }
-    return h('div', { class: 'prog' }, h('span', { class: 'tag', text: STATUS[a.status] }));
+    return h('div', { class: 'prog' }, h('span', { class: 'tag', text: statusLabel(a.status, a.jenis) }));
   }
 
   function card(a) {
@@ -115,12 +129,22 @@
 
   function header() {
     const page = document.body.dataset.page;
-    const nav = [['index.html', 'Beranda', 'home'], ['daftar.html', 'Semua anime', 'list']];
-    if (apiBase()) nav.push(['tambah.html', 'Tambah anime', 'add']);
+    const jenisParam = new URLSearchParams(location.search).get('jenis');
+    const nav = [
+      ['index.html', 'Beranda', 'home'],
+      ['daftar.html', 'Semua', 'list:semua'],
+      ['daftar.html?jenis=anime', 'Anime', 'list:anime'],
+      ['daftar.html?jenis=film', 'Film', 'list:film'],
+      ['daftar.html?jenis=serial', 'Drama', 'list:serial'],
+      ['daftar.html?jenis=game', 'Game', 'list:game'],
+    ];
+    if (apiBase()) nav.push(['tambah.html', 'Tambah', 'add']);
+    const current = page === 'list' ? 'list:' + (JENIS[jenisParam] ? jenisParam : 'semua')
+      : page === 'detail' ? 'list:semua' : page;
     $('#top').append(h('div', { class: 'wrap top-in' },
-      h('a', { class: 'logo', href: 'index.html', text: 'Watchlist Anime' }),
+      h('a', { class: 'logo', href: 'index.html', text: 'Watchlist' }),
       h('nav', { 'aria-label': 'Utama' }, nav.map(([href, label, p]) =>
-        h('a', { href, text: label, 'aria-current': (p === page || (page === 'detail' && p === 'list')) ? 'page' : null })))));
+        h('a', { href, text: label, 'aria-current': p === current ? 'page' : null })))));
   }
 
   function footer(source) {
@@ -130,15 +154,20 @@
       : null;
     let note;
     if (source === 'live') {
-      note = 'Data langsung dari Notion. Anime baru bisa ditambahkan di halaman Tambah anime.';
+      note = 'Data langsung dari Notion. Judul baru bisa ditambahkan di halaman Tambah.';
     } else if (source === 'fallback') {
       note = 'Tidak bisa menghubungi Notion saat ini. Yang tampil adalah data hasil sinkronisasi terakhir' + (when ? `, ${when}` : '') + '.';
     } else if (meta.sumber === 'notion' && when) {
-      note = `Data dari Notion, terakhir disinkronkan ${when}. Untuk menambah atau mengubah anime, buka Notion.`;
+      note = `Data dari Notion, terakhir disinkronkan ${when}. Untuk menambah atau mengubah judul, buka Notion.`;
     } else {
       note = 'Menampilkan data contoh. Setelah tersambung ke Notion, daftar ini diganti otomatis.';
     }
-    document.body.append(h('footer', {}, h('div', { class: 'wrap' }, h('span', { text: note }))));
+    const tmdb = (window.ANIME || []).some((a) => /themoviedb\.org/.test(a.mal || ''));
+    const rawgUsed = (window.ANIME || []).some((a) => /rawg\.io/.test(a.mal || ''));
+    document.body.append(h('footer', {}, h('div', { class: 'wrap' },
+      h('span', { text: note }),
+      tmdb ? h('span', { text: 'Data film dan serial dari TMDB. Situs ini memakai API TMDB tetapi tidak didukung atau disertifikasi oleh TMDB.' }) : null,
+      rawgUsed ? h('span', {}, 'Data game dari ', h('a', { href: 'https://rawg.io', target: '_blank', rel: 'noopener', text: 'RAWG' }), '.') : null)));
   }
 
   // ---------- Beranda ----------
@@ -148,9 +177,13 @@
     const next = all.find((a) => a.status === 'ditonton') || all.find((a) => a.status === 'rencana');
 
     if (next) {
-      const lede = next.status === 'ditonton'
-        ? `Lanjutkan dari episode ${next.ep + 1}${next.total ? ' dari ' + next.total : ''}.`
-        : 'Berikutnya di antreanmu' + [next.total ? next.total + ' episode' : null, next.studio ? 'oleh ' + next.studio : null].filter(Boolean).map((s, i) => (i ? ', ' : ': ') + s).join('') + '.';
+      const isFilm = !hasEpisodes(next);
+      const bits = [next.jenis !== 'anime' ? JENIS[next.jenis] : null, next.platform, !isFilm && next.total ? next.total + ' episode' : null, next.studio ? 'oleh ' + next.studio : null].filter(Boolean);
+      const lede = next.status === 'ditonton' && next.jenis === 'game'
+        ? `Sedang kamu mainkan${next.platform ? ' di ' + next.platform : ''}.`
+        : next.status === 'ditonton' && !isFilm
+          ? `Lanjutkan dari episode ${next.ep + 1}${next.total ? ' dari ' + next.total : ''}.`
+          : 'Berikutnya di antreanmu' + bits.map((b, i) => (i ? ', ' : ': ') + b).join('') + '.';
       app.append(h('section', { class: 'wrap hero' },
         poster(next),
         h('div', {},
@@ -174,25 +207,31 @@
     if (!shown) {
       app.append(h('section', { class: 'wrap' },
         h('p', { class: 'empty', text: apiBase()
-          ? 'Belum ada anime. Tambahkan lewat halaman Tambah anime.'
-          : 'Belum ada anime. Tambahkan anime baru di database Notion, lalu tunggu sinkronisasi berikutnya.' })));
+          ? 'Belum ada judul. Tambahkan lewat halaman Tambah.'
+          : 'Belum ada judul. Tambahkan judul baru di database Notion, lalu tunggu sinkronisasi berikutnya.' })));
     }
   }
 
   // ---------- Daftar ----------
   function list() {
     const app = $('#app');
-    const all = items();
+    const everything = items();
     const params = new URLSearchParams(location.search);
     const startStatus = ORDER.includes(params.get('status')) ? params.get('status') : 'semua';
-    const state = { q: '', status: startStatus, genre: 'semua', sort: 'judul' };
+    const jenis = JENIS[params.get('jenis')] ? params.get('jenis') : 'semua';
+    const state = { q: '', status: startStatus, genre: 'semua', asal: 'semua', sort: 'judul' };
+    const all = jenis === 'semua' ? everything : everything.filter((a) => a.jenis === jenis);
+    const heading = jenis === 'semua' ? 'Semua judul' : JENIS[jenis];
+    document.title = heading + ' | Watchlist';
 
     const genres = [...new Set(all.flatMap((a) => a.genre))].sort();
+    const byPlatform = jenis === 'game';   // game difilter per platform, bukan asal
+    const asalAda = byPlatform ? PLATFORM.filter((x) => all.some((a) => a.platform === x)) : ASAL.filter((x) => all.some((a) => a.asal === x));
     const out = h('div', { class: 'cards' });
     const count = h('p', { class: 'count', 'aria-live': 'polite' });
-    const empty = h('p', { class: 'empty', text: 'Tidak ada anime yang cocok. Ubah filter atau kata kunci.' });
+    const empty = h('p', { class: 'empty', text: 'Tidak ada judul yang cocok. Ubah filter atau kata kunci.' });
 
-    const chipDefs = [['semua', 'Semua'], ...ORDER.map((s) => [s, STATUS[s]])];
+    const chipDefs = [['semua', 'Semua'], ...ORDER.map((s) => [s, statusLabel(s, jenis)])];
     const chips = chipDefs.map(([value, label]) =>
       h('button', {
         type: 'button', class: 'chip', text: label, 'data-value': value,
@@ -202,6 +241,8 @@
     const search = h('input', { type: 'search', placeholder: 'Cari judul', 'aria-label': 'Cari judul', oninput: (e) => { state.q = e.target.value.trim(); draw(); } });
     const genreSel = h('select', { 'aria-label': 'Genre', onchange: (e) => { state.genre = e.target.value; draw(); } },
       h('option', { value: 'semua', text: 'Semua genre' }), genres.map((g) => h('option', { value: g, text: g })));
+    const asalSel = h('select', { 'aria-label': byPlatform ? 'Platform' : 'Asal', onchange: (e) => { state.asal = e.target.value; draw(); } },
+      h('option', { value: 'semua', text: byPlatform ? 'Semua platform' : 'Semua asal' }), asalAda.map((x) => h('option', { value: x, text: x })));
     const sortSel = h('select', { 'aria-label': 'Urutkan', onchange: (e) => { state.sort = e.target.value; draw(); } },
       h('option', { value: 'judul', text: 'Judul A-Z' }),
       h('option', { value: 'rating', text: 'Rating tertinggi' }),
@@ -211,21 +252,22 @@
       const r = all.filter((a) =>
         (state.status === 'semua' || a.status === state.status) &&
         (state.genre === 'semua' || a.genre.includes(state.genre)) &&
+        (state.asal === 'semua' || (byPlatform ? a.platform : a.asal) === state.asal) &&
         a.judul.toLowerCase().includes(state.q.toLowerCase()));
       if (state.sort === 'judul') r.sort((a, b) => a.judul.localeCompare(b.judul));
       if (state.sort === 'rating') r.sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1));
       if (state.sort === 'progres') r.sort((a, b) => (b.total ? b.ep / b.total : 0) - (a.total ? a.ep / a.total : 0));
       out.replaceChildren(...r.map(card));
       empty.hidden = r.length > 0;
-      count.textContent = `${r.length} dari ${all.length} anime`;
+      count.textContent = `${r.length} dari ${all.length} judul`;
       chips.forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.value === state.status)));
     }
 
-    app.append(h('section', { class: 'wrap page-head' }, h('h1', { text: 'Semua anime' })),
+    app.append(h('section', { class: 'wrap page-head' }, h('h1', { text: heading })),
       h('section', { class: 'wrap' },
         h('div', { class: 'filters' },
           h('div', { class: 'filter-row' }, chips),
-          h('div', { class: 'filter-row' }, search, genreSel, sortSel)),
+          h('div', { class: 'filter-row' }, search, genreSel, asalSel, sortSel)),
         count, out, empty));
     draw();
   }
@@ -238,14 +280,15 @@
 
     if (!a) {
       app.append(h('section', { class: 'wrap' },
-        h('a', { class: 'back', href: 'daftar.html', text: 'Kembali ke semua anime' }),
-        h('p', { class: 'empty', text: 'Anime ini tidak ditemukan. Mungkin judulnya diubah atau sudah dihapus di Notion.' })));
+        h('a', { class: 'back', href: 'daftar.html', text: 'Kembali ke daftar' }),
+        h('p', { class: 'empty', text: 'Judul ini tidak ditemukan. Mungkin diubah atau sudah dihapus di Notion.' })));
       return;
     }
-    document.title = a.judul + ' | Watchlist Anime';
+    document.title = a.judul + ' | Watchlist';
 
     const api = apiBase();
     const canEdit = !!(api && a.notionId);
+    const isFilm = !hasEpisodes(a);   // film dan game: hanya status, tanpa episode
 
     const panel = h('div', { class: 'panel' });
     const say = h('p', { class: 'msg', role: 'status' });
@@ -286,7 +329,7 @@
         const src = (window.ANIME || []).find((x) => x.notionId === a.notionId);
         if (src) { src.ep = a.ep; src.status = a.status; }
         rememberPw();
-        notify(a.status === 'selesai' ? 'Tersimpan. Selesai ditonton!' : `Tersimpan: ${STATUS[a.status]}, episode ${a.ep}.`, 'ok');
+        notify(a.status === 'selesai' ? (a.jenis === 'game' ? 'Tersimpan. Tamat!' : 'Tersimpan. Selesai ditonton!') : isFilm ? `Tersimpan: ${statusLabel(a.status, a.jenis)}.` : `Tersimpan: ${STATUS[a.status]}, episode ${a.ep}.`, 'ok');
       } catch (err) {
         notify(err.message, 'err');
       } finally {
@@ -316,7 +359,7 @@
     async function removeAnime() {
       if (busy) return;
       if (!pw.value) { notify('Isi kata sandi dulu untuk menghapus.', 'err'); pw.focus(); return; }
-      if (!window.confirm(`Hapus "${a.judul}" dari daftar?\n\nAnime ini dipindahkan ke tempat sampah Notion, jadi masih bisa dipulihkan dari sana.`)) return;
+      if (!window.confirm(`Hapus "${a.judul}" dari daftar?\n\nJudul ini dipindahkan ke tempat sampah Notion, jadi masih bisa dipulihkan dari sana.`)) return;
       busy = true; draw(); notify('Menghapus...');
       try {
         let res;
@@ -340,7 +383,7 @@
     }
 
     function draw() {
-      const ticks = a.total && a.total <= 100
+      const ticks = !isFilm && a.total && a.total <= 100
         ? h('div', canEdit
             ? { class: 'ticks', role: 'group', 'aria-label': 'Pilih episode terakhir yang sudah ditonton' }
             : { class: 'ticks', role: 'img', 'aria-label': `${a.ep} dari ${a.total} episode sudah ditonton` },
@@ -356,48 +399,44 @@
           }))
         : null;
 
-      const controls = canEdit ? h('div', { class: 'controls' },
+      const controls = canEdit && !isFilm ? h('div', { class: 'controls' },
         h('button', { type: 'button', class: 'btn', disabled: busy || a.ep <= 0 ? true : null, text: '\u22121 episode', onclick: () => setProgress(a.ep - 1) }),
         h('button', { type: 'button', class: 'btn primary', disabled: busy || (a.total && a.ep >= a.total) ? true : null, text: '+1 episode', onclick: () => setProgress(a.ep + 1) })) : null;
 
       const statusRow = canEdit ? h('label', { class: 'field status-set', for: 'status-set' },
         h('span', { text: 'Status' }),
         h('select', { id: 'status-set', disabled: busy ? true : null, onchange: (e) => setStatus(e.target.value) },
-          Object.entries(STATUS).map(([k, v]) => h('option', { value: k, text: v, selected: k === a.status ? true : null })))) : null;
+          Object.keys(STATUS).map((k) => h('option', { value: k, text: statusLabel(k, a.jenis), selected: k === a.status ? true : null })))) : null;
 
       const pwRow = canEdit ? h('div', { class: 'progress-pw' },
-        h('label', { class: 'field', for: 'pw' }, h('span', { text: 'Kata sandi (untuk mengubah progres)' }), pw),
+        h('label', { class: 'field', for: 'pw' }, h('span', { text: 'Kata sandi (untuk mengubah atau menghapus)' }), pw),
         h('label', { class: 'check', for: 'remember' }, remember, h('span', { text: 'Ingat kata sandi di perangkat ini' }))) : null;
 
       const removeRow = canEdit ? h('div', { class: 'danger-zone' },
         h('button', { type: 'button', class: 'btn danger', disabled: busy ? true : null, text: 'Hapus dari daftar', onclick: removeAnime })) : null;
 
       panel.replaceChildren(...[
-        h('h2', { text: STATUS[a.status] }),
-        h('p', { class: 'big-count' }, String(a.ep), h('span', { text: a.total ? ' / ' + a.total + ' episode' : ' episode' })),
+        h('h2', { text: statusLabel(a.status, a.jenis) }),
+        isFilm ? null : h('p', { class: 'big-count' }, String(a.ep), h('span', { text: a.total ? ' / ' + a.total + ' episode' : ' episode' })),
         ticks, controls, statusRow,
         canEdit ? say : null,
         pwRow, removeRow,
-        canEdit ? null : h('p', { class: 'note', text: 'Progres diubah lewat Notion dan muncul di sini setelah data dimuat ulang.' }),
+        canEdit ? null : h('p', { class: 'note', text: 'Data diubah lewat Notion dan muncul di sini setelah data dimuat ulang.' }),
       ].filter(Boolean));
     }
     draw();
 
     app.append(h('section', { class: 'wrap' },
-      h('a', { class: 'back', href: 'daftar.html', text: 'Kembali ke semua anime' }),
+      h('a', { class: 'back', href: 'daftar.html', text: 'Kembali ke daftar' }),
       h('div', { class: 'detail' },
         poster(a),
         h('div', {},
           h('h1', { text: a.judul }),
-          h('div', { class: 'facts' },
-            a.tipe ? h('span', { text: a.tipe }) : null,
-            a.total ? h('span', { text: a.total + ' episode' }) : null,
-            a.studio ? h('span', { text: a.studio }) : null,
-            a.rating ? h('span', { text: 'Rating kamu ' + a.rating + '/10' }) : null),
+          facts(a, a.rating ? h('span', { text: 'Rating kamu ' + a.rating + '/10' }) : null),
           chipRow(a.genre),
           h('p', { class: a.sinopsis ? 'syn-full' : 'syn-full muted', text: a.sinopsis || 'Belum ada sinopsis. Isi kolom Sinopsis di Notion.' }),
           panel,
-          a.mal ? h('a', { class: 'btn', href: a.mal, target: '_blank', rel: 'noopener', text: 'Buka di MyAnimeList' }) : null))));
+          a.mal ? h('a', { class: 'btn', href: a.mal, target: '_blank', rel: 'noopener', text: /themoviedb\.org/.test(a.mal) ? 'Buka di TMDB' : /rawg\.io/.test(a.mal) ? 'Buka di RAWG' : 'Buka di MyAnimeList' }) : null))));
   }
 
   // ---------- Tambah anime ----------
@@ -418,6 +457,8 @@
     const clean = (t) => (t || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').replace(/\s*\(Source:[^)]*\)\s*$/i, '').trim() || null;
     return media.filter((m) => m.idMal).map((m) => ({
       malId: m.idMal,
+      tautan: `https://myanimelist.net/anime/${m.idMal}`,
+      asal: 'Jepang',
       judul: m.title.english || m.title.romaji,
       tipe: ANILIST_TYPE[m.format] || null,
       tahun: m.seasonYear || null,
@@ -430,16 +471,16 @@
   }
 
   // Pencarian lewat penghubung (server yang memanggil sumber data), dengan cadangan lewat browser.
-  async function searchAnime(query, api, password) {
+  async function searchAnime(query, api, password, jenis = 'anime') {
     let res;
     try {
-      res = await fetch(api + '/api/cari?q=' + encodeURIComponent(query), { headers: { 'X-Admin-Password': password } });
+      res = await fetch(api + '/api/cari?q=' + encodeURIComponent(query) + '&jenis=' + encodeURIComponent(jenis), { headers: { 'X-Admin-Password': password } });
     } catch {
       throw new Error('Tidak bisa terhubung ke penghubung. Periksa apiUrl di config.js dan koneksi internetmu.');
     }
     const data = await res.json().catch(() => ({}));
     if (res.ok) return data.results || [];
-    if (res.status === 502 || res.status === 503 || res.status === 504) {
+    if (jenis === 'anime' && (res.status === 502 || res.status === 503 || res.status === 504)) {
       try { return await searchAniListBrowser(query); } catch { /* pakai pesan dari penghubung */ }
     }
     throw new Error(data.error || `Pencarian gagal (kode ${res.status}).`);
@@ -451,7 +492,7 @@
 
     if (!api) {
       app.append(h('section', { class: 'wrap page-head' },
-        h('h1', { text: 'Tambah anime' }),
+        h('h1', { text: 'Tambah judul' }),
         h('p', { class: 'empty', text: 'Fitur ini belum aktif. Pasang penghubung Cloudflare (lihat README), lalu isi apiUrl di config.js.' })));
       return;
     }
@@ -465,7 +506,26 @@
     const remember = h('input', { type: 'checkbox', id: 'remember', checked: saved ? true : null });
     const status = h('select', { id: 'status' },
       h('option', { value: 'rencana', text: 'Rencana' }),
-      h('option', { value: 'ditonton', text: 'Sedang Ditonton' }));
+      h('option', { value: 'ditonton', text: 'Sedang Ditonton' }),
+      h('option', { value: 'selesai', text: 'Selesai' }));
+    const statusOpsi = () => [...status.options];
+    const jenisSel = h('select', { id: 'jenis' }, Object.entries(JENIS).map(([k, v]) => h('option', { value: k, text: v })));
+    const asalSel = h('select', { id: 'asal' });
+    const asalLabel = h('span', { text: 'Asal' });
+    const searchLabel = h('span', { text: 'Cari anime' });
+    const isGame = () => jenisSel.value === 'game';
+
+    // Untuk game, kolom "Asal" diganti "Platform"; kata status juga menyesuaikan.
+    function refreshJenis() {
+      const game = isGame();
+      asalLabel.textContent = game ? 'Platform' : 'Asal';
+      asalSel.replaceChildren(
+        h('option', { value: 'auto', text: game ? 'Pilih per hasil pencarian' : 'Otomatis (dari sumber data)' }),
+        ...(game ? PLATFORM : ASAL).map((x) => h('option', { value: x, text: x })));
+      statusOpsi().forEach((o) => { o.textContent = statusLabel(o.value, jenisSel.value); });
+      searchLabel.textContent = 'Cari ' + JENIS[jenisSel.value].toLowerCase();
+    }
+    refreshJenis();
 
     const field = (label, input) => h('label', { class: 'field' }, h('span', { text: label }), input);
 
@@ -515,17 +575,24 @@
 
     // --- Pencarian anime ---
     const results = h('div', { class: 'results' });
-    const q = h('input', { type: 'search', id: 'q', placeholder: 'Ketik judul anime', autocomplete: 'off' });
-    const existingIds = () => new Set(items().map((a) => ((a.mal || '').match(/anime\/(\d+)/) || [])[1]).filter(Boolean));
+    const q = h('input', { type: 'search', id: 'q', placeholder: 'Ketik judul', autocomplete: 'off' });
+    const existingLinks = () => new Set(items().map((a) => a.mal).filter(Boolean));
+    const asalDipilih = (r) => (isGame() ? null : asalSel.value === 'auto' ? (r && r.asal) || null : asalSel.value);
+    const platformAwal = () => (isGame() && asalSel.value !== 'auto' ? asalSel.value : null);
 
     function renderResults(list) {
-      const have = existingIds();
+      const have = existingLinks();
       results.replaceChildren(...list.map((r) => {
-        const already = have.has(String(r.malId));
+        const already = have.has(r.tautan);
         const btn = h('button', { type: 'button', class: 'btn primary', text: already ? 'Sudah ada' : 'Tambah', disabled: already ? true : null });
+        // Game bisa ada di beberapa platform, jadi platformnya dipilih per hasil.
+        const platforms = r.jenis === 'game' ? (r.platforms && r.platforms.length ? r.platforms : PLATFORM) : null;
+        const pilih = platforms ? h('select', { 'aria-label': 'Platform yang kamu mainkan', disabled: already ? true : null },
+          platforms.map((x) => h('option', { value: x, text: x, selected: x === (platformAwal() || platforms[0]) ? true : null }))) : null;
         btn.addEventListener('click', () => send({
           judul: r.judul, status: status.value, total: r.total, genre: r.genre, studio: r.studio,
-          tipe: r.tipe, sinopsis: r.sinopsis, mal: `https://myanimelist.net/anime/${r.malId}`, cover: r.cover,
+          tipe: r.tipe, sinopsis: r.sinopsis, mal: r.tautan, cover: r.cover,
+          jenis: r.jenis || jenisSel.value, asal: r.jenis === 'game' ? null : asalDipilih(r), platform: pilih ? pilih.value : null,
         }, btn));
         return h('div', { class: 'card result' },
           poster({ judul: r.judul, cover: r.cover }),
@@ -534,23 +601,27 @@
             facts(r),
             chipRow(r.genre),
             r.sinopsis ? h('p', { class: 'syn', text: r.sinopsis }) : null,
-            h('div', { class: 'prog' }, btn)));
+            h('div', { class: 'prog' }, pilih, btn)));
       }));
     }
 
     async function doSearch() {
       const term = q.value.trim();
       if (term.length < 2) { notify('Ketik minimal 2 huruf untuk mencari.', 'err'); return; }
-      notify('Mencari anime...');
+      notify('Mencari...');
       results.replaceChildren();
       try {
-        const list = await searchAnime(term, api, pw.value);
+        const list = await searchAnime(term, api, pw.value, jenisSel.value);
         notify(list.length ? '' : 'Tidak ada hasil. Coba judul lain atau tambah manual di bawah.');
         renderResults(list);
       } catch (err) {
         notify(err.message, 'err');
       }
     }
+    jenisSel.addEventListener('change', () => {
+      refreshJenis();
+      results.replaceChildren(); notify('');
+    });
     q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); doSearch(); } });
 
     // --- Tambah manual ---
@@ -562,7 +633,7 @@
     };
     const manual = h('form', { class: 'manual' },
       field('Judul', m.judul),
-      field('Total episode (boleh kosong)', m.total),
+      field('Total episode (boleh kosong; abaikan untuk film dan game)', m.total),
       field('Alamat gambar poster (boleh kosong)', m.cover),
       field('Sinopsis (boleh kosong)', m.sinopsis),
       h('button', { type: 'submit', class: 'btn primary', text: 'Tambah' }));
@@ -570,23 +641,27 @@
       e.preventDefault();
       const ok = await send({
         judul: m.judul.value, status: status.value,
-        total: m.total.value === '' ? null : m.total.value,
+        jenis: jenisSel.value, asal: asalDipilih(null), platform: platformAwal(),
+        total: m.total.value === '' || !hasEpisodes({ jenis: jenisSel.value }) ? null : m.total.value,
         cover: m.cover.value.trim() || null, sinopsis: m.sinopsis.value.trim() || null,
       }, null);
       if (ok) manual.reset();
     });
 
     app.append(
-      h('section', { class: 'wrap page-head' }, h('h1', { text: 'Tambah anime' })),
+      h('section', { class: 'wrap page-head' }, h('h1', { text: 'Tambah judul' })),
       h('section', { class: 'wrap add' },
         h('div', { class: 'panel' },
           h('div', { class: 'add-row' },
             field('Kata sandi', pw),
             field('Status awal', status)),
+          h('div', { class: 'add-row' },
+            field('Jenis', jenisSel),
+            h('label', { class: 'field' }, asalLabel, asalSel)),
           h('label', { class: 'check', for: 'remember' }, remember, 'Ingat kata sandi di perangkat ini')),
         h('div', { class: 'panel' },
           h('div', { class: 'add-search' },
-            h('label', { class: 'field grow', for: 'q' }, h('span', { text: 'Cari anime' }), q),
+            h('label', { class: 'field grow', for: 'q' }, searchLabel, q),
             h('button', { type: 'button', class: 'btn primary', text: 'Cari', onclick: doSearch }))),
         say,
         results,
