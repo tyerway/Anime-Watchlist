@@ -92,6 +92,7 @@ Penghubung mengecek jadwal untuk judul berstatus **Sedang Ditonton** dan **Renca
 | Jenis | Sumber | Isi |
 |---|---|---|
 | Anime | AniList (lewat tautan MyAnimeList) | tanggal dan jam episode berikutnya (WIB), atau tanggal rilis perdana |
+| Anime (jika AniList memblokir penghubung) | Jikan (MyAnimeList) | perkiraan dari jadwal siaran mingguan Jepang, tanpa nomor episode |
 | Serial Drama | TMDB | tanggal episode berikutnya, atau tayang perdana |
 | Film | TMDB | jadwal bioskop Indonesia; jika belum ada, tanggal rilis global (diberi keterangan) |
 | Game | Steam atau RAWG | tanggal rilis, hanya untuk game yang belum rilis |
