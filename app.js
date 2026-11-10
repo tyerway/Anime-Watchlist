@@ -125,12 +125,25 @@
     return h('div', { class: 'prog' }, h('span', { class: 'tag', text: statusLabel(a.status, a.jenis) }));
   }
 
+  // Jadwal rilis berikutnya (diisi otomatis oleh penghubung). Disembunyikan jika sudah lewat.
+  function rilisInfo(a) {
+    if (!a.rilis) return null;
+    const jam = a.rilis.length > 10;
+    const d = new Date(jam ? a.rilis : a.rilis + 'T00:00:00+07:00');
+    if (Number.isNaN(d.getTime())) return null;
+    if (d.getTime() < Date.now() - (jam ? 3 * 3600e3 : 0) - (jam ? 0 : 86400e3 - 1)) return null;
+    const opsi = jam ? { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' } : { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
+    const teks = new Intl.DateTimeFormat('id-ID', { ...opsi, timeZone: 'Asia/Jakarta' }).format(d) + (jam ? ' WIB' : '');
+    return h('p', { class: 'rilis', text: '🗓 ' + teks + (a.infoRilis ? ' · ' + a.infoRilis : '') });
+  }
+
   function card(a) {
     return h('a', { class: 'card', href: 'anime.html?id=' + encodeURIComponent(a.id) },
       poster(a),
       h('div', { class: 'card-body' },
         h('h3', { text: a.judul }),
         facts(a),
+        rilisInfo(a),
         chipRow(a.genre),
         a.sinopsis ? h('p', { class: 'syn', text: a.sinopsis }) : null,
         progress(a)));
@@ -446,6 +459,7 @@
         h('div', {},
           h('h1', { text: a.judul }),
           facts(a, a.rating ? h('span', { text: 'Rating kamu ' + a.rating + '/10' }) : null),
+          rilisInfo(a),
           chipRow(a.genre),
           h('p', { class: a.sinopsis ? 'syn-full' : 'syn-full muted', text: a.sinopsis || 'Belum ada sinopsis. Isi kolom Sinopsis di Notion.' }),
           panel,
