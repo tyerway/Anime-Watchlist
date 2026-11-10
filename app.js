@@ -77,12 +77,21 @@
     return n;
   }
 
+  // Poster TMDB/IGDB/Steam dimuat lewat penghubung, karena sebagian jaringan memblokir situs gambarnya.
+  function coverSrc(u) {
+    const base = apiBase();
+    if (base && /^https:\/\/(image\.tmdb\.org|images\.igdb\.com|[\w.]+\.steamstatic\.com|media\.rawg\.io)\//.test(u)) {
+      return base + '/api/gambar?u=' + encodeURIComponent(u);
+    }
+    return u;
+  }
+
   function poster(a) {
     const box = h('div', { class: 'poster', style: `--h:${hue(a.judul)}` });
     const initials = a.judul.split(/[\s:;]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
     box.append(h('span', { class: 'poster-fallback', 'aria-hidden': 'true', text: initials }));
     if (a.cover) {
-      const img = h('img', { src: a.cover, alt: 'Poster ' + a.judul, loading: 'lazy', referrerpolicy: 'no-referrer' });
+      const img = h('img', { src: coverSrc(a.cover), alt: 'Poster ' + a.judul, loading: 'lazy', referrerpolicy: 'no-referrer' });
       img.addEventListener('error', () => img.remove());
       box.append(img);
     }
@@ -164,10 +173,14 @@
     }
     const tmdb = (window.ANIME || []).some((a) => /themoviedb\.org/.test(a.mal || ''));
     const rawgUsed = (window.ANIME || []).some((a) => /rawg\.io/.test(a.mal || ''));
+    const igdbUsed = (window.ANIME || []).some((a) => /igdb\.com/.test(a.mal || ''));
+    const steamUsed = (window.ANIME || []).some((a) => /steampowered\.com/.test(a.mal || ''));
     document.body.append(h('footer', {}, h('div', { class: 'wrap' },
       h('span', { text: note }),
       tmdb ? h('span', { text: 'Data film dan serial dari TMDB. Situs ini memakai API TMDB tetapi tidak didukung atau disertifikasi oleh TMDB.' }) : null,
-      rawgUsed ? h('span', {}, 'Data game dari ', h('a', { href: 'https://rawg.io', target: '_blank', rel: 'noopener', text: 'RAWG' }), '.') : null)));
+      rawgUsed ? h('span', {}, 'Data game dari ', h('a', { href: 'https://rawg.io', target: '_blank', rel: 'noopener', text: 'RAWG' }), '.') : null,
+      igdbUsed ? h('span', {}, 'Data game dari ', h('a', { href: 'https://www.igdb.com', target: '_blank', rel: 'noopener', text: 'IGDB' }), '.') : null,
+      steamUsed ? h('span', {}, 'Data game dari ', h('a', { href: 'https://store.steampowered.com', target: '_blank', rel: 'noopener', text: 'Steam' }), '.') : null)));
   }
 
   // ---------- Beranda ----------
@@ -436,7 +449,7 @@
           chipRow(a.genre),
           h('p', { class: a.sinopsis ? 'syn-full' : 'syn-full muted', text: a.sinopsis || 'Belum ada sinopsis. Isi kolom Sinopsis di Notion.' }),
           panel,
-          a.mal ? h('a', { class: 'btn', href: a.mal, target: '_blank', rel: 'noopener', text: /themoviedb\.org/.test(a.mal) ? 'Buka di TMDB' : /rawg\.io/.test(a.mal) ? 'Buka di RAWG' : 'Buka di MyAnimeList' }) : null))));
+          a.mal ? h('a', { class: 'btn', href: a.mal, target: '_blank', rel: 'noopener', text: /themoviedb\.org/.test(a.mal) ? 'Buka di TMDB' : /rawg\.io/.test(a.mal) ? 'Buka di RAWG' : /igdb\.com/.test(a.mal) ? 'Buka di IGDB' : /steampowered\.com/.test(a.mal) ? 'Buka di Steam' : 'Buka di MyAnimeList' }) : null))));
   }
 
   // ---------- Tambah anime ----------
