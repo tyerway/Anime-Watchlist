@@ -35,8 +35,9 @@ Situs (GitHub Pages)  <-->  Penghubung (Cloudflare Worker)  <-->  Notion
 3. Salin **Internal Integration Secret**. Itu token Notion.
 4. Buka database **Anime Watchlist**, klik `...` di kanan atas, pilih **Connections**, lalu tambahkan integrasi tadi.
 5. Catat **ID database**: 32 karakter di URL database, tepat sebelum tanda `?`.
-6. Pastikan database punya tiga kolom **Select** ini (nama persis): **Jenis** dengan pilihan `Anime`, `Film`, `Serial Drama`, `Game`; **Asal** dengan pilihan `Barat`, `Jepang`, `Korea`, `Lainnya`; dan **Platform** dengan pilihan `PS1`, `PS2`, `PS3`, `PS4`, `PS5`, `PSP`, `PS Vita`, `PC`, `Switch`, `Xbox`, `Mobile`, `Lainnya`. Entri lama tanpa Jenis dianggap Anime.
+6. Pastikan database punya kolom **Select** ini (nama persis): **Jenis** dengan pilihan `Anime`, `Film`, `Serial Drama`, `Game`; **Asal** dengan pilihan `Barat`, `Jepang`, `Korea`, `Lainnya`; dan **Platform** dengan pilihan `PS1`, `PS2`, `PS3`, `PS4`, `PS5`, `PSP`, `PS Vita`, `PC`, `Switch`, `Xbox`, `Mobile`, `Lainnya`. Entri lama tanpa Jenis dianggap Anime.
 7. Pada **Capabilities** integrasi, centang juga **Update content** agar progres, status, dan hapus bisa disimpan dari situs.
+8. Untuk jadwal rilis, tambahkan kolom **Rilis Berikutnya** (tipe Date) dan **Info Rilis** (tipe Text). Keduanya diisi otomatis oleh penghubung.
 
 ### B. Cloudflare (penghubung)
 
@@ -53,6 +54,7 @@ Situs (GitHub Pages)  <-->  Penghubung (Cloudflare Worker)  <-->  Notion
    | `TMDB_API_KEY` | Secret (opsional) | kunci API TMDB untuk mencari film dan serial. Tanpa ini, film dan drama tetap bisa ditambah lewat **Tambah manual** |
    | `RAWG_API_KEY` | Secret (opsional) | kunci API RAWG untuk mencari game. Tanpa ini, game tetap bisa ditambah lewat **Tambah manual** |
    | `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET` | Secret (opsional) | akun Twitch untuk pencarian game lewat IGDB (cadangan RAWG) |
+   | `KALENDER_TOKEN` | Secret (opsional) | kata acak panjang (minimal 20 karakter) untuk alamat kalender Google. Lihat bagian Jadwal rilis |
 
 4. Klik **Deploy** lagi. Alamat penghubung muncul di halaman Worker, bentuknya `https://anime-api.AKUN.workers.dev`.
 5. Cek: buka `https://anime-api.AKUN.workers.dev/api/anime` di browser. Jika benar, yang tampil adalah daftar anime berbentuk JSON.
@@ -82,6 +84,30 @@ Situs (GitHub Pages)  <-->  Penghubung (Cloudflare Worker)  <-->  Notion
 Penghubung mencoba sumber berurutan dan memakai yang pertama berhasil: **RAWG** (jika `RAWG_API_KEY` ada), lalu **IGDB** (jika kunci Twitch ada), lalu **Steam**. Steam tidak butuh kunci apa pun, jadi pencarian game selalu jalan, tetapi hanya mencakup game PC. Untuk game PS1, PS2, dan konsol lain, pasang RAWG atau IGDB.
 
 Kunci IGDB: buka https://dev.twitch.tv/console (akun Twitch dengan verifikasi 2 langkah aktif), pilih **Register Your Application** (Category: Application Integration, Redirect URL `http://localhost`), lalu salin **Client ID** dan buat **Client Secret**. Simpan sebagai secret `IGDB_CLIENT_ID` dan `IGDB_CLIENT_SECRET`, lalu **Deploy**.
+
+### Jadwal rilis dan pengingat
+
+Penghubung mengecek jadwal untuk judul berstatus **Sedang Ditonton** dan **Rencana**, lalu mengisi kolom **Rilis Berikutnya** dan **Info Rilis** di Notion:
+
+| Jenis | Sumber | Isi |
+|---|---|---|
+| Anime | AniList (lewat tautan MyAnimeList) | tanggal dan jam episode berikutnya (WIB), atau tanggal rilis perdana |
+| Serial Drama | TMDB | tanggal episode berikutnya, atau tayang perdana |
+| Film | TMDB | jadwal bioskop Indonesia; jika belum ada, tanggal rilis global (diberi keterangan) |
+| Game | Steam atau RAWG | tanggal rilis, hanya untuk game yang belum rilis |
+
+Judul yang sudah Selesai, Ditunda, atau Dihentikan dibersihkan jadwalnya. Judul tanpa tautan sumber (ditambah manual) tidak dicek.
+
+**Menjalankan otomatis:** di Cloudflare buka worker `anime-api` > **Settings > Trigger Events** (atau **Triggers**) > **Add > Cron Triggers**, isi `0 */6 * * *` (tiap 6 jam), lalu simpan. Cron gratis. Untuk mengecek sekarang juga, kirim `POST` ke `/api/cek-rilis` dengan header `X-Admin-Password`.
+
+**Pengingat di Notion:** buka kolom **Rilis Berikutnya** di tampilan database, klik tanggalnya, lalu aktifkan **Remind** (misalnya 1 hari sebelumnya). Karena kolomnya berubah otomatis, pengingatnya ikut mengikuti jadwal terbaru. Notion Calendar juga bisa menampilkan database ini.
+
+**Google Calendar:**
+1. Buat secret `KALENDER_TOKEN` di worker (kata acak panjang), lalu **Deploy**.
+2. Di Google Calendar (versi web) buka **Lainnya (+) di samping "Kalender lain" > Dari URL**, lalu tempel `https://anime-api.AKUN.workers.dev/api/kalender.ics?t=TOKEN-KAMU`.
+3. Atur pengingat di **Pengaturan > pilih kalender "Watchlist: Jadwal Rilis" > Notifikasi acara**.
+
+Google memperbarui kalender langganan tiap beberapa jam sampai sekitar sehari, jadi jadwal baru bisa terlambat muncul. Anggap alamat kalender itu rahasia: siapa pun yang punya alamatnya bisa melihat jadwal judul-judulmu. Untuk mengganti, ubah `KALENDER_TOKEN` lalu langganan ulang.
 
 ## Memakai
 
