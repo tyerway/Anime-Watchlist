@@ -167,3 +167,5 @@ button.tick:disabled { cursor: progress; opacity: .6; }
 
 /* Pilihan platform pada hasil pencarian game */
 .card .prog select { max-width: 150px; font-size: .85rem; padding: 6px 10px; }
+
+.rilis { margin: 6px 0 2px; font-size: .88rem; color: var(--sakura); font-weight: 500; }
