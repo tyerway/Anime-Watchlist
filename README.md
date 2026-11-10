@@ -24,6 +24,7 @@ Situs (GitHub Pages)  <-->  Penghubung (Cloudflare Worker)  <-->  Notion
 | `config.js` | Alamat penghubung (`apiUrl`) |
 | `worker/worker.js` | Kode penghubung untuk Cloudflare Workers |
 | `scripts/sync-notion.mjs`, `.github/workflows/sync-notion.yml` | Salinan cadangan otomatis dan deploy |
+| `scripts/rilis-anime.mjs`, `.github/workflows/rilis-anime.yml` | Mengisi jadwal rilis anime di Notion (lewat GitHub Actions) |
 | `data.js` | Data contoh; diganti otomatis saat deploy |
 
 ## Pemasangan (sekali saja)
@@ -92,12 +93,14 @@ Penghubung mengecek jadwal untuk judul berstatus **Sedang Ditonton** dan **Renca
 | Jenis | Sumber | Isi |
 |---|---|---|
 | Anime | AniList (lewat tautan MyAnimeList) | tanggal dan jam episode berikutnya (WIB), atau tanggal rilis perdana |
-| Anime (jika AniList memblokir penghubung) | Jikan (MyAnimeList) | perkiraan dari jadwal siaran mingguan Jepang, tanpa nomor episode |
+| Anime | AniList, dijalankan oleh GitHub Actions (`scripts/rilis-anime.mjs`) | tanggal dan jam episode berikutnya (WIB), atau tanggal rilis perdana |
 | Serial Drama | TMDB | tanggal episode berikutnya, atau tayang perdana |
 | Film | TMDB | jadwal bioskop Indonesia; jika belum ada, tanggal rilis global (diberi keterangan) |
 | Game | Steam atau RAWG | tanggal rilis, hanya untuk game yang belum rilis |
 
 Judul yang sudah Selesai, Ditunda, atau Dihentikan dibersihkan jadwalnya. Judul tanpa tautan sumber (ditambah manual) tidak dicek.
+
+**Anime lewat GitHub Actions:** AniList memblokir alamat server Cloudflare, jadi jadwal anime diisi oleh GitHub Actions (workflow **Jadwal rilis anime**, tiap 6 jam, memakai secret `NOTION_TOKEN` dan `NOTION_DATABASE_ID` yang sudah ada). Untuk menjalankannya sekarang: tab **Actions > Jadwal rilis anime > Run workflow**. Agar worker tidak ikut menyentuh anime, tambahkan variabel Text `JADWAL_ANIME` dengan isi `github` di worker. Cadangan lewat Jikan (perkiraan dari jadwal siaran Jepang) hanya aktif jika `JIKAN_CADANGAN` diisi `ya`; Jikan sering tidak bisa dijangkau dari Cloudflare, jadi tidak disarankan.
 
 **Menjalankan otomatis:** di Cloudflare buka worker `anime-api` > **Settings > Trigger Events** (atau **Triggers**) > **Add > Cron Triggers**, isi `0 */6 * * *` (tiap 6 jam), lalu simpan. Cron gratis. Untuk mengecek sekarang juga, kirim `POST` ke `/api/cek-rilis` dengan header `X-Admin-Password`.
 
