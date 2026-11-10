@@ -45,8 +45,13 @@ export function mapPage(page, usedIds = new Set()) {
     genre: (p['Genre']?.multi_select ?? []).map((g) => g.name),
     studio: p['Studio']?.select?.name ?? null,
     tipe: p['Tipe']?.select?.name ?? null,
+    jenis: { Anime: 'anime', Film: 'film', 'Serial Drama': 'serial', Game: 'game' }[p['Jenis']?.select?.name] ?? 'anime',
+    asal: p['Asal']?.select?.name ?? null,
+    platform: p['Platform']?.select?.name ?? null,
     sinopsis: plain(p['Sinopsis']?.rich_text) || null,
     mal: p['Tautan MAL']?.url ?? null,
+    rilis: p['Rilis Berikutnya']?.date?.start ?? null,
+    infoRilis: plain(p['Info Rilis']?.rich_text) || null,
     // Hanya cover berupa link (external). File yang diunggah ke Notion alamatnya kedaluwarsa dalam 1 jam.
     cover: coverType === 'external' ? page.cover.external.url : null,
     _coverSkipped: coverType === 'file',
