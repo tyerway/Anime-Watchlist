@@ -169,3 +169,57 @@ button.tick:disabled { cursor: progress; opacity: .6; }
 .card .prog select { max-width: 150px; font-size: .85rem; padding: 6px 10px; }
 
 .rilis { margin: 6px 0 2px; font-size: .88rem; color: var(--sakura); font-weight: 500; }
+
+/* Beranda: dinding poster */
+.wall-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px 16px; flex-wrap: wrap; padding-top: 24px; padding-bottom: 14px; }
+.wall-bar .chip small { font-size: .8em; opacity: .7; margin-left: 2px; }
+.wall { --cols: 6; display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 6px; }
+.tile { position: relative; display: block; padding: 0; border: 0; background: none; border-radius: 6px; overflow: hidden; cursor: pointer;
+  aspect-ratio: 2 / 3; font: inherit; color: inherit; transition: transform .18s ease, opacity .18s ease, box-shadow .18s ease; }
+.tile.big { grid-column: span 2; grid-row: span 2; aspect-ratio: auto; }
+.tile .poster { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; border-radius: 0; }
+.tile::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--jc, var(--sakura)); z-index: 1; }
+.tile.on { box-shadow: 0 0 0 2px var(--text); z-index: 2; }
+.tile-live { position: absolute; top: 7px; right: 7px; z-index: 1; width: 9px; height: 9px; border-radius: 50%; background: var(--sakura); box-shadow: 0 0 0 2px rgba(16, 20, 31, .85); }
+.j-anime { --jc: #ff7ea8; } .j-film { --jc: #72d6ff; } .j-serial { --jc: #b6f08a; } .j-game { --jc: #ffc66e; }
+@media (hover: hover) {
+  .wall:hover .tile:not(:hover) { opacity: .5; }
+  .tile:hover { transform: scale(1.04); z-index: 3; box-shadow: 0 8px 22px rgba(0, 0, 0, .5); }
+}
+.wall.reveal .tile { animation: tile-in .45s ease both; animation-delay: var(--d, 0ms); }
+@keyframes tile-in { from { opacity: 0; transform: translateY(12px) scale(.97); } }
+
+.cap { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 10px 44px; align-items: end; padding-top: 24px; padding-bottom: 36px; }
+.cap h1 { margin: 0 0 10px; font-size: clamp(1.7rem, 3.6vw, 2.7rem); line-height: 1.05; letter-spacing: -.03em; font-weight: 700; }
+.cap .facts { margin-bottom: 8px; }
+.cap-status { margin: 0 0 2px; }
+.cap-syn { margin: 0 0 16px; font: 1.02rem/1.65 var(--serif); color: #d6dbee; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+.strip { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x proximity; margin: 0 -20px; padding: 4px 20px 14px; scrollbar-width: thin; }
+.mini { flex: none; width: 128px; text-decoration: none; scroll-snap-align: start; }
+.mini .poster { width: 100%; }
+.mini b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 8px; font-size: .92rem; line-height: 1.25; font-weight: 600; }
+.mini span { display: block; margin-top: 2px; color: var(--muted); font-size: .8rem; }
+.mini:hover b { color: var(--sakura); }
+
+.agenda { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.agenda a { display: grid; grid-template-columns: 52px 44px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 10px 16px 10px 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--panel); text-decoration: none; }
+.agenda a:hover { border-color: var(--sakura); }
+.ag-date { text-align: center; line-height: 1.05; }
+.ag-date b { display: block; font-size: 1.55rem; letter-spacing: -.02em; }
+.ag-date span { font-size: .8rem; color: var(--muted); }
+.ag-poster .poster { width: 44px; border-radius: 4px; }
+.ag-poster .poster-fallback { font-size: 1rem; }
+.ag-body { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ag-body strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.ag-body span { color: var(--muted); font-size: .85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ag-when { text-align: right; color: var(--sakura); font-weight: 600; font-size: .92rem; white-space: nowrap; }
+.ag-when small { display: block; color: var(--muted); font-weight: 400; font-size: .78rem; }
+
+@media (max-width: 760px) {
+  .wall { gap: 4px; }
+  .cap { grid-template-columns: 1fr; padding-bottom: 28px; }
+  .agenda a { grid-template-columns: 44px minmax(0, 1fr) auto; }
+  .ag-poster { display: none; }
+}
