@@ -55,6 +55,7 @@ Situs (GitHub Pages)  <-->  Penghubung (Cloudflare Worker)  <-->  Notion
    | `TMDB_API_KEY` | Secret (opsional) | kunci API TMDB untuk mencari film dan serial. Tanpa ini, film dan drama tetap bisa ditambah lewat **Tambah manual** |
    | `RAWG_API_KEY` | Secret (opsional) | kunci API RAWG untuk mencari game. Tanpa ini, game tetap bisa ditambah lewat **Tambah manual** |
    | `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET` | Secret (opsional) | akun Twitch untuk pencarian game lewat IGDB (cadangan RAWG) |
+   | `GIANTBOMB_API_KEY` | Secret (opsional) | kunci Giant Bomb untuk pencarian game konsol, daftar hanya dengan email |
    | `KALENDER_TOKEN` | Secret (opsional) | kata acak panjang (minimal 20 karakter) untuk alamat kalender Google. Lihat bagian Jadwal rilis |
 
 4. Klik **Deploy** lagi. Alamat penghubung muncul di halaman Worker, bentuknya `https://anime-api.AKUN.workers.dev`.
@@ -82,7 +83,9 @@ Situs (GitHub Pages)  <-->  Penghubung (Cloudflare Worker)  <-->  Notion
 
 ### Pencarian game: RAWG, IGDB, Steam
 
-Penghubung mencoba sumber berurutan dan memakai yang pertama berhasil: **RAWG** (jika `RAWG_API_KEY` ada), lalu **IGDB** (jika kunci Twitch ada), lalu **Steam**. Steam tidak butuh kunci apa pun, jadi pencarian game selalu jalan, tetapi hanya mencakup game PC. Untuk game PS1, PS2, dan konsol lain, pasang RAWG atau IGDB.
+Penghubung mencoba sumber berurutan dan memakai yang pertama berhasil: **RAWG** (jika `RAWG_API_KEY` ada), lalu **IGDB** (jika kunci Twitch ada), lalu **Giant Bomb** (jika `GIANTBOMB_API_KEY` ada), lalu **Steam**. Steam tidak butuh kunci apa pun, jadi pencarian game selalu jalan, tetapi hanya mencakup game PC. Untuk game PS1, PS2, dan konsol lain, pasang RAWG atau IGDB.
+
+Kunci Giant Bomb (tanpa nomor telepon): daftar akun dengan email di https://www.giantbomb.com, lalu buka https://www.giantbomb.com/api/ dan salin **API key** yang tampil. Simpan sebagai secret `GIANTBOMB_API_KEY` di worker, lalu **Deploy**. Kuota gratisnya terbatas (sekitar 200 permintaan per jam), cukup untuk pemakaian pribadi.
 
 Kunci IGDB: buka https://dev.twitch.tv/console (akun Twitch dengan verifikasi 2 langkah aktif), pilih **Register Your Application** (Category: Application Integration, Redirect URL `http://localhost`), lalu salin **Client ID** dan buat **Client Secret**. Simpan sebagai secret `IGDB_CLIENT_ID` dan `IGDB_CLIENT_SECRET`, lalu **Deploy**.
 
@@ -130,7 +133,7 @@ Google memperbarui kalender langganan tiap beberapa jam sampai sekitar sehari, j
 - Paket gratis Cloudflare cukup untuk pemakaian pribadi (100.000 permintaan per hari).
 - Pencarian dijalankan oleh penghubung, bukan browser, jadi tetap jalan walau jaringan atau ekstensi browser-mu memblokir sumbernya. Pencarian butuh kata sandi yang sama dengan menambah judul. Sumber data punya batas permintaan; jika kena batas, tunggu sebentar lalu coba lagi.
 - Kolom `Tautan MAL` dipakai juga untuk tautan TMDB (film dan serial) dan menjadi kunci pencegah judul ganda.
-- Data game dari RAWG, IGDB, atau Steam sesuai sumber yang dipakai; situs menampilkan tautan sumbernya di footer.
+- Data game dari RAWG, IGDB, Giant Bomb, atau Steam sesuai sumber yang dipakai; situs menampilkan tautan sumbernya di footer.
 - Poster (TMDB, IGDB, Steam, RAWG) dimuat lewat penghubung (`/api/gambar`), jadi tetap tampil walau ISP atau ekstensi browser memblokir situs gambarnya.
 - Data film dan serial dari TMDB. Situs ini memakai API TMDB tetapi tidak didukung atau disertifikasi oleh TMDB. Sinopsis dari MyAnimeList ikut tersimpan di database dan tampil di situsmu.
 - Tanpa `apiUrl`, situs tetap jalan memakai `data.js` dan halaman Tambah nonaktif.
