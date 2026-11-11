@@ -234,3 +234,12 @@ button.tick:disabled { cursor: progress; opacity: .6; }
   .agenda a { grid-template-columns: 44px minmax(0, 1fr) auto; }
   .ag-poster { display: none; }
 }
+
+/* Tombol utama: medium turquoise */
+:root { --aksen: #48d1cc; --aksen-teks: #04302e; }
+.btn.primary, button.chip[aria-pressed="true"] { background: var(--aksen); border-color: var(--aksen); color: var(--aksen-teks); }
+.btn.primary:hover { border-color: var(--aksen); filter: brightness(1.08); }
+.btn:hover, button.tick:hover:not(:disabled) { border-color: var(--aksen); }
+.btn.primary:disabled:hover { border-color: var(--aksen); }
+.deck-nav:hover { border-color: var(--aksen); background: var(--aksen); }
+.deck-nav:hover::before { border-color: var(--aksen-teks); }
