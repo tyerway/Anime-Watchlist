@@ -225,7 +225,6 @@
           : 'Belum ada judul. Tambahkan judul baru di database Notion, lalu tunggu sinkronisasi berikutnya.' })));
       return;
     }
-    const next = all.find((a) => a.status === 'ditonton') || all.find((a) => a.status === 'rencana') || all[all.length - 1];
     let filter = 'semua';
     let pertama = true;
     let urut = [];
@@ -292,7 +291,7 @@
     function susun() {
       for (const [k, el] of Object.entries(chipEls)) el.setAttribute('aria-pressed', String(k === filter));
       const list = filter === 'semua' ? all : all.filter((a) => a.jenis === filter);
-      urut = [...(list.includes(next) ? [next] : []), ...acak(list.filter((a) => a !== next))].slice(0, 5);
+      urut = acak(list).slice(0, 5);
       idx = 0;
       deck.classList.toggle('reveal', pertama);
       pertama = false;
