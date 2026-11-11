@@ -9,7 +9,7 @@ Situs (GitHub Pages)  <-->  Penghubung (Cloudflare Worker)  <-->  Notion
 ```
 
 - **Membaca:** situs meminta daftar ke penghubung, jadi judul baru langsung tampil.
-- **Menambah:** halaman Tambah mencari judul (anime lewat AniList, film dan serial lewat TMDB, game lewat RAWG, IGDB, atau Steam), lalu mengirim pilihanmu ke penghubung. Pencarian dijalankan oleh penghubung. Penghubung memeriksa kata sandimu dan menyimpannya ke Notion.
+- **Menambah:** halaman Tambah mencari judul (anime lewat AniList, film dan serial lewat TMDB, game lewat RAWG, IGDB, Wikipedia, atau Steam), lalu mengirim pilihanmu ke penghubung. Pencarian dijalankan oleh penghubung. Penghubung memeriksa kata sandimu dan menyimpannya ke Notion.
 - **Token Notion hanya ada di penghubung**, tidak pernah ada di kode situs. Situs hanya menyimpan kata sandi yang kamu ketik sendiri.
 - **Cadangan:** GitHub Actions menyimpan salinan data (`data.js`) tiap sekitar 15 menit. Jika penghubung sedang mati, situs menampilkan salinan itu.
 
@@ -55,7 +55,6 @@ Situs (GitHub Pages)  <-->  Penghubung (Cloudflare Worker)  <-->  Notion
    | `TMDB_API_KEY` | Secret (opsional) | kunci API TMDB untuk mencari film dan serial. Tanpa ini, film dan drama tetap bisa ditambah lewat **Tambah manual** |
    | `RAWG_API_KEY` | Secret (opsional) | kunci API RAWG untuk mencari game. Tanpa ini, game tetap bisa ditambah lewat **Tambah manual** |
    | `IGDB_CLIENT_ID`, `IGDB_CLIENT_SECRET` | Secret (opsional) | akun Twitch untuk pencarian game lewat IGDB (cadangan RAWG) |
-   | `GIANTBOMB_API_KEY` | Secret (opsional) | kunci Giant Bomb untuk pencarian game konsol, daftar hanya dengan email |
    | `KALENDER_TOKEN` | Secret (opsional) | kata acak panjang (minimal 20 karakter) untuk alamat kalender Google. Lihat bagian Jadwal rilis |
 
 4. Klik **Deploy** lagi. Alamat penghubung muncul di halaman Worker, bentuknya `https://anime-api.AKUN.workers.dev`.
@@ -81,11 +80,9 @@ Situs (GitHub Pages)  <-->  Penghubung (Cloudflare Worker)  <-->  Notion
 2. Simpan sebagai secret `RAWG_API_KEY` di worker Cloudflare, lalu **Deploy**.
 3. Di halaman Tambah, pilih jenis **Game**, lalu cari. Poster, genre, pengembang, deskripsi, dan tahun rilis terisi otomatis. Setiap hasil punya pilihan **Platform** (PS1, PS2, PC, dan seterusnya) yang kamu mainkan; pilih sebelum klik Tambah.
 
-### Pencarian game: RAWG, IGDB, Steam
+### Pencarian game: RAWG, IGDB, Wikipedia, Steam
 
-Penghubung mencoba sumber berurutan dan memakai yang pertama berhasil: **RAWG** (jika `RAWG_API_KEY` ada), lalu **IGDB** (jika kunci Twitch ada), lalu **Giant Bomb** (jika `GIANTBOMB_API_KEY` ada), lalu **Steam**. Steam tidak butuh kunci apa pun, jadi pencarian game selalu jalan, tetapi hanya mencakup game PC. Untuk game PS1, PS2, dan konsol lain, pasang RAWG atau IGDB.
-
-Kunci Giant Bomb (tanpa nomor telepon): daftar akun dengan email di https://www.giantbomb.com, lalu buka https://www.giantbomb.com/api/ dan salin **API key** yang tampil. Simpan sebagai secret `GIANTBOMB_API_KEY` di worker, lalu **Deploy**. Kuota gratisnya terbatas (sekitar 200 permintaan per jam), cukup untuk pemakaian pribadi.
+Penghubung mencoba sumber berurutan dan memakai yang pertama berhasil: **RAWG** (jika `RAWG_API_KEY` ada), lalu **IGDB** (jika kunci Twitch ada), lalu **Wikipedia** (tanpa kunci; judul, sampul, sinopsis, tahun, developer, genre, dan platform dari Wikidata, bisa kurang lengkap, jadi platform tetap kamu pilih sendiri), lalu **Steam** (tanpa kunci, hanya game PC). Wikipedia mencakup game konsol seperti PS1 dan PS2 tanpa pendaftaran. Judul yang tidak ketemu bisa lewat tombol Tambah manual.
 
 Kunci IGDB: buka https://dev.twitch.tv/console (akun Twitch dengan verifikasi 2 langkah aktif), pilih **Register Your Application** (Category: Application Integration, Redirect URL `http://localhost`), lalu salin **Client ID** dan buat **Client Secret**. Simpan sebagai secret `IGDB_CLIENT_ID` dan `IGDB_CLIENT_SECRET`, lalu **Deploy**.
 
@@ -99,7 +96,7 @@ Penghubung mengecek jadwal untuk judul berstatus **Sedang Ditonton** dan **Renca
 | Anime | AniList, dijalankan oleh GitHub Actions (`scripts/rilis-anime.mjs`) | tanggal dan jam episode berikutnya (WIB), atau tanggal rilis perdana |
 | Serial Drama | TMDB | tanggal episode berikutnya, atau tayang perdana |
 | Film | TMDB | jadwal bioskop Indonesia; jika belum ada, tanggal rilis global (diberi keterangan) |
-| Game | Steam atau RAWG | tanggal rilis, hanya untuk game yang belum rilis |
+| Game | Steam, Wikipedia, atau RAWG | tanggal rilis, hanya untuk game yang belum rilis |
 
 Judul yang sudah Selesai, Ditunda, atau Dihentikan dibersihkan jadwalnya. Judul tanpa tautan sumber (ditambah manual) tidak dicek.
 
@@ -133,8 +130,8 @@ Google memperbarui kalender langganan tiap beberapa jam sampai sekitar sehari, j
 - Paket gratis Cloudflare cukup untuk pemakaian pribadi (100.000 permintaan per hari).
 - Pencarian dijalankan oleh penghubung, bukan browser, jadi tetap jalan walau jaringan atau ekstensi browser-mu memblokir sumbernya. Pencarian butuh kata sandi yang sama dengan menambah judul. Sumber data punya batas permintaan; jika kena batas, tunggu sebentar lalu coba lagi.
 - Kolom `Tautan MAL` dipakai juga untuk tautan TMDB (film dan serial) dan menjadi kunci pencegah judul ganda.
-- Data game dari RAWG, IGDB, Giant Bomb, atau Steam sesuai sumber yang dipakai; situs menampilkan tautan sumbernya di footer.
-- Poster (TMDB, IGDB, Steam, RAWG) dimuat lewat penghubung (`/api/gambar`), jadi tetap tampil walau ISP atau ekstensi browser memblokir situs gambarnya.
+- Data game dari RAWG, IGDB, Wikipedia (CC BY-SA), atau Steam sesuai sumber yang dipakai; situs menampilkan tautan sumbernya di footer.
+- Poster (TMDB, IGDB, Steam, RAWG, Wikipedia) dimuat lewat penghubung (`/api/gambar`), jadi tetap tampil walau ISP atau ekstensi browser memblokir situs gambarnya.
 - Data film dan serial dari TMDB. Situs ini memakai API TMDB tetapi tidak didukung atau disertifikasi oleh TMDB. Sinopsis dari MyAnimeList ikut tersimpan di database dan tampil di situsmu.
 - Tanpa `apiUrl`, situs tetap jalan memakai `data.js` dan halaman Tambah nonaktif.
 - GitHub bisa menonaktifkan jadwal otomatis pada repository publik yang tidak aktif selama 60 hari. Jika itu terjadi, aktifkan lagi di tab Actions. Situs tetap berjalan lewat penghubung.
