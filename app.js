@@ -126,14 +126,21 @@
   }
 
   // Jadwal rilis berikutnya (diisi otomatis oleh penghubung). Disembunyikan jika sudah lewat.
-  function rilisInfo(a) {
+  // Tanggal rilis berikutnya sebagai {d, jam}; null jika kosong atau sudah lewat.
+  function rilisDate(a) {
     if (!a.rilis) return null;
     const jam = a.rilis.length > 10;
     const d = new Date(jam ? a.rilis : a.rilis + 'T00:00:00+07:00');
     if (Number.isNaN(d.getTime())) return null;
     if (d.getTime() < Date.now() - (jam ? 3 * 3600e3 : 0) - (jam ? 0 : 86400e3 - 1)) return null;
-    const opsi = jam ? { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' } : { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
-    const teks = new Intl.DateTimeFormat('id-ID', { ...opsi, timeZone: 'Asia/Jakarta' }).format(d) + (jam ? ' WIB' : '');
+    return { d, jam };
+  }
+
+  function rilisInfo(a) {
+    const r = rilisDate(a);
+    if (!r) return null;
+    const opsi = r.jam ? { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' } : { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' };
+    const teks = new Intl.DateTimeFormat('id-ID', { ...opsi, timeZone: 'Asia/Jakarta' }).format(r.d) + (r.jam ? ' WIB' : '');
     return h('p', { class: 'rilis', text: '🗓 ' + teks + (a.infoRilis ? ' · ' + a.infoRilis : '') });
   }
 
@@ -197,44 +204,149 @@
   }
 
   // ---------- Beranda ----------
+  const JENIS_PENDEK = { anime: 'Anime', film: 'Film', serial: 'Drama', game: 'Game' };
+  const acak = (arr) => {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+    return a;
+  };
+  const hariWib = (d) => Math.floor((d.getTime() + 7 * 3600e3) / 86400e3);
+  const link = (a) => 'anime.html?id=' + encodeURIComponent(a.id);
+
+  // Susunan dinding: judul pilihan di depan (besar), sisanya diacak; yang punya poster didahulukan.
+  function susunDinding(list, depan, ponsel) {
+    const rest = list.filter((a) => a !== depan);
+    const urut = [...acak(rest.filter((a) => a.cover)), ...acak(rest.filter((a) => !a.cover))];
+    let isi = depan && list.includes(depan) ? [depan, ...urut] : urut;
+    isi = isi.slice(0, ponsel ? 16 : 24);
+    const cols = ponsel ? 4 : isi.length >= 18 ? 8 : isi.length >= 10 ? 6 : 4;
+    const besar = (n) => (n >= 16 ? [0, 9] : n >= 8 ? [0] : []);
+    let n = isi.length;
+    while (n > cols && (n + 3 * besar(n).length) % cols) n--;
+    return { isi: isi.slice(0, n), cols, besar: besar(n) };
+  }
+
   function home() {
     const app = $('#app');
     const all = items();
-    const next = all.find((a) => a.status === 'ditonton') || all.find((a) => a.status === 'rencana');
+    if (!all.length) {
+      app.append(h('section', { class: 'wrap' },
+        h('p', { class: 'empty', text: apiBase()
+          ? 'Belum ada judul. Tambahkan lewat halaman Tambah.'
+          : 'Belum ada judul. Tambahkan judul baru di database Notion, lalu tunggu sinkronisasi berikutnya.' })));
+      return;
+    }
+    const next = all.find((a) => a.status === 'ditonton') || all.find((a) => a.status === 'rencana') || all[all.length - 1];
+    let filter = 'semua';
+    let pertama = true;
+    let dipilih = next;
 
-    if (next) {
-      const isFilm = !hasEpisodes(next);
-      const bits = [next.jenis !== 'anime' ? JENIS[next.jenis] : null, next.platform, !isFilm && next.total ? next.total + ' episode' : null, next.studio ? 'oleh ' + next.studio : null].filter(Boolean);
-      const lede = next.status === 'ditonton' && next.jenis === 'game'
-        ? `Sedang kamu mainkan${next.platform ? ' di ' + next.platform : ''}.`
-        : next.status === 'ditonton' && !isFilm
-          ? `Lanjutkan dari episode ${next.ep + 1}${next.total ? ' dari ' + next.total : ''}.`
-          : 'Berikutnya di antreanmu' + bits.map((b, i) => (i ? ', ' : ': ') + b).join('') + '.';
-      app.append(h('section', { class: 'wrap hero' },
-        poster(next),
-        h('div', {},
-          h('h1', { text: next.judul }),
-          h('p', { class: 'lede', text: lede }),
-          next.sinopsis ? h('p', { class: 'syn-big', text: next.sinopsis }) : null,
-          h('a', { class: 'btn primary', href: 'anime.html?id=' + encodeURIComponent(next.id), text: 'Buka detail' }))));
+    // --- bilah filter ---
+    const hitung = { semua: all.length };
+    for (const k of Object.keys(JENIS_PENDEK)) hitung[k] = all.filter((a) => a.jenis === k).length;
+    const chipEls = {};
+    const bar = h('div', { class: 'wrap wall-bar' },
+      h('div', { class: 'chips', role: 'group', 'aria-label': 'Filter jenis' },
+        ['semua', ...Object.keys(JENIS_PENDEK)].filter((k) => k === 'semua' || hitung[k]).map((k) => {
+          chipEls[k] = h('button', { type: 'button', class: 'chip', 'aria-pressed': String(k === filter), onclick: () => { filter = k; bangun(); } },
+            (k === 'semua' ? 'Semua' : JENIS_PENDEK[k]) + ' ', h('small', { text: String(hitung[k]) }));
+          return chipEls[k];
+        })),
+      h('button', { type: 'button', class: 'btn quiet', onclick: () => bangun(), text: 'Acak ulang' }));
+
+    const kecil = window.matchMedia('(max-width: 760px)');
+    const wall = h('div', { class: 'wall', role: 'group', 'aria-label': 'Poster koleksi' });
+    const cap = h('section', { class: 'wrap cap', 'aria-live': 'polite' });
+
+    // --- keterangan di bawah dinding ---
+    function pilih(a) {
+      dipilih = a;
+      for (const t of wall.children) t.classList.toggle('on', t._a === a);
+      let status;
+      if (a.status === 'ditonton' && a.jenis === 'game') status = `Sedang dimainkan${a.platform ? ' di ' + a.platform : ''}.`;
+      else if (a.status === 'ditonton' && hasEpisodes(a)) status = `Lanjutkan dari episode ${a.ep + 1}${a.total ? ' dari ' + a.total : ''}.`;
+      else if (a.status === 'selesai') status = a.jenis === 'game' ? 'Sudah tamat.' : 'Sudah selesai.';
+      else status = statusLabel(a.status, a.jenis) + '.';
+      cap.replaceChildren(
+        h('div', { class: 'cap-main' },
+          h('h1', { text: a.judul }),
+          facts(a),
+          h('p', { class: 'cap-status', text: status }),
+          rilisInfo(a)),
+        h('div', { class: 'cap-side' },
+          a.sinopsis ? h('p', { class: 'cap-syn', text: a.sinopsis }) : null,
+          h('a', { class: 'btn primary', href: link(a), text: 'Buka detail' })));
     }
 
-    let shown = 0;
+    // --- dinding poster ---
+    function bangun() {
+      for (const [k, el] of Object.entries(chipEls)) el.setAttribute('aria-pressed', String(k === filter));
+      const list = filter === 'semua' ? all : all.filter((a) => a.jenis === filter);
+      const { isi, cols, besar } = susunDinding(list, list.includes(next) ? next : null, kecil.matches);
+      wall.style.setProperty('--cols', cols);
+      wall.classList.toggle('reveal', pertama);
+      pertama = false;
+      wall.replaceChildren(...isi.map((a, i) => {
+        const t = h('button', {
+          type: 'button',
+          class: `tile j-${a.jenis}${besar.includes(i) ? ' big' : ''}`,
+          style: `--d:${Math.min(i * 22, 600)}ms`,
+          'aria-label': `${a.judul}, ${JENIS[a.jenis] || 'Anime'}, ${statusLabel(a.status, a.jenis)}`,
+          onclick: () => pilih(a),
+          onfocus: () => pilih(a),
+          onpointerenter: (e) => { if (e.pointerType === 'mouse') pilih(a); },
+        }, poster(a), a.status === 'ditonton' ? h('i', { class: 'tile-live', title: statusLabel(a.status, a.jenis) }) : null);
+        t._a = a;
+        return t;
+      }));
+      pilih(isi.includes(dipilih) ? dipilih : isi[0]);
+    }
+
+    app.append(bar, h('div', { class: 'wrap' }, wall), cap);
+    bangun();
+    kecil.addEventListener('change', () => bangun());
+
+    // --- baru ditambahkan (urutan database = urutan ditambahkan) ---
+    const baru = all.slice(-10).reverse();
+    app.append(h('section', { class: 'wrap shelf' },
+      h('div', { class: 'shelf-head' }, h('h2', {}, 'Baru ditambahkan'), h('a', { href: 'daftar.html', text: 'Lihat semua' })),
+      h('div', { class: 'strip' }, baru.map((a) =>
+        h('a', { class: 'mini', href: link(a) },
+          poster(a),
+          h('b', { text: a.judul }),
+          h('span', { text: `${JENIS_PENDEK[a.jenis] || 'Anime'} · ${statusLabel(a.status, a.jenis)}` }))))));
+
+    // --- segera tayang ---
+    const hariIni = hariWib(new Date());
+    const segera = all.map((a) => ({ a, r: rilisDate(a) })).filter((x) => x.r).sort((x, y) => x.r.d - y.r.d).slice(0, 6);
+    if (segera.length) {
+      const bln = new Intl.DateTimeFormat('id-ID', { month: 'short', timeZone: 'Asia/Jakarta' });
+      const tgl = new Intl.DateTimeFormat('id-ID', { day: 'numeric', timeZone: 'Asia/Jakarta' });
+      const jamF = new Intl.DateTimeFormat('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' });
+      app.append(h('section', { class: 'wrap shelf' },
+        h('div', { class: 'shelf-head' }, h('h2', {}, 'Segera tayang')),
+        h('ul', { class: 'agenda' }, segera.map(({ a, r }) => {
+          const sel = hariWib(r.d) - hariIni;
+          const kapan = sel <= 0 ? 'Hari ini' : sel === 1 ? 'Besok' : `${sel} hari lagi`;
+          return h('li', {}, h('a', { href: link(a) },
+            h('div', { class: 'ag-date' }, h('b', { text: tgl.format(r.d) }), h('span', { text: bln.format(r.d) })),
+            h('div', { class: 'ag-poster' }, poster(a)),
+            h('div', { class: 'ag-body' },
+              h('strong', { text: a.judul }),
+              h('span', { text: [JENIS_PENDEK[a.jenis] || 'Anime', a.infoRilis].filter(Boolean).join(' · ') })),
+            h('div', { class: 'ag-when' }, kapan, r.jam ? h('small', { text: jamF.format(r.d).replace('.', ':') + ' WIB' }) : null)));
+        }))));
+    }
+
+    // --- rak per status ---
     for (const st of ['ditonton', 'rencana', 'selesai']) {
       const list = all.filter((a) => a.status === st);
       if (!list.length) continue;
-      shown++;
       app.append(h('section', { class: 'wrap shelf' },
         h('div', { class: 'shelf-head' },
           h('h2', {}, STATUS[st], h('small', { text: String(list.length) })),
           list.length > 4 ? h('a', { href: 'daftar.html?status=' + st, text: 'Lihat semua' }) : null),
         h('div', { class: 'cards' }, list.slice(0, 4).map(card))));
-    }
-    if (!shown) {
-      app.append(h('section', { class: 'wrap' },
-        h('p', { class: 'empty', text: apiBase()
-          ? 'Belum ada judul. Tambahkan lewat halaman Tambah.'
-          : 'Belum ada judul. Tambahkan judul baru di database Notion, lalu tunggu sinkronisasi berikutnya.' })));
     }
   }
 
