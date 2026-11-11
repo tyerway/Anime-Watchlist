@@ -17,7 +17,7 @@ Situs (GitHub Pages)  <-->  Penghubung (Cloudflare Worker)  <-->  Notion
 
 | File | Isi |
 |---|---|
-| `index.html` | Beranda: dinding poster semua jenis (arahkan atau klik poster untuk melihat keterangannya, filter per jenis, Acak ulang), Baru ditambahkan, Segera tayang, lalu daftar per status |
+| `index.html` | Beranda: deretan lima poster besar yang bertumpuk miring (geser dengan panah, keyboard, geser jari, atau klik poster di samping), filter jenis, Acak ulang, Baru ditambahkan, Segera tayang, lalu daftar per status |
 | `daftar.html` | Semua judul dengan filter status, genre, asal, pencarian, dan urutan. `?jenis=anime`, `?jenis=film`, `?jenis=serial`, atau `?jenis=game` untuk satu jenis saja. Game difilter per platform |
 | `anime.html?id=...` | Detail satu judul: progres episode (anime dan serial), status, hapus. Film dan game hanya punya status |
 | `tambah.html` | Pilih jenis (Anime, Film, Serial Drama, Game), cari lalu tambah, atau isi manual |
