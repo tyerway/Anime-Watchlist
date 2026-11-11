@@ -243,3 +243,8 @@ button.tick:disabled { cursor: progress; opacity: .6; }
 .btn.primary:disabled:hover { border-color: var(--aksen); }
 .deck-nav:hover { border-color: var(--aksen); background: var(--aksen); }
 .deck-nav:hover::before { border-color: var(--aksen-teks); }
+
+/* Label jenis, jadwal tayang, dan sorotan hover: turquoise */
+.facts .jenis, .rilis, .ag-when { color: var(--aksen); }
+.mini:hover b { color: var(--aksen); }
+.card:hover, .agenda a:hover { border-color: var(--aksen); }
