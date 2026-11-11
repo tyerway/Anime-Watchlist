@@ -740,7 +740,7 @@
         const already = have.has(r.tautan);
         const btn = h('button', { type: 'button', class: 'btn primary', text: already ? 'Sudah ada' : 'Tambah', disabled: already ? true : null });
         // Game bisa ada di beberapa platform, jadi platformnya dipilih per hasil.
-        const platforms = r.jenis === 'game' ? (r.platforms && r.platforms.length ? r.platforms : PLATFORM) : null;
+        const platforms = r.jenis === 'game' ? [...new Set([...(r.platforms || []), ...PLATFORM])] : null; // yang terdeteksi di depan, sisanya tetap bisa dipilih
         const pilih = platforms ? h('select', { 'aria-label': 'Platform yang kamu mainkan', disabled: already ? true : null },
           platforms.map((x) => h('option', { value: x, text: x, selected: x === (platformAwal() || platforms[0]) ? true : null }))) : null;
         btn.addEventListener('click', () => send({
