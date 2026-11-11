@@ -213,19 +213,6 @@
   const hariWib = (d) => Math.floor((d.getTime() + 7 * 3600e3) / 86400e3);
   const link = (a) => 'anime.html?id=' + encodeURIComponent(a.id);
 
-  // Susunan dinding: judul pilihan di depan (besar), sisanya diacak; yang punya poster didahulukan.
-  function susunDinding(list, depan, ponsel) {
-    const rest = list.filter((a) => a !== depan);
-    const urut = [...acak(rest.filter((a) => a.cover)), ...acak(rest.filter((a) => !a.cover))];
-    let isi = depan && list.includes(depan) ? [depan, ...urut] : urut;
-    isi = isi.slice(0, ponsel ? 16 : 24);
-    const cols = ponsel ? 4 : isi.length >= 18 ? 8 : isi.length >= 10 ? 6 : 4;
-    const besar = (n) => (n >= 16 ? [0, 9] : n >= 8 ? [0] : []);
-    let n = isi.length;
-    while (n > cols && (n + 3 * besar(n).length) % cols) n--;
-    return { isi: isi.slice(0, n), cols, besar: besar(n) };
-  }
-
   function home() {
     const app = $('#app');
     const all = items();
@@ -239,7 +226,8 @@
     const next = all.find((a) => a.status === 'ditonton') || all.find((a) => a.status === 'rencana') || all[all.length - 1];
     let filter = 'semua';
     let pertama = true;
-    let dipilih = next;
+    let urut = [];
+    let idx = 0;
 
     // --- bilah filter ---
     const hitung = { semua: all.length };
@@ -248,20 +236,20 @@
     const bar = h('div', { class: 'wrap wall-bar' },
       h('div', { class: 'chips', role: 'group', 'aria-label': 'Filter jenis' },
         ['semua', ...Object.keys(JENIS_PENDEK)].filter((k) => k === 'semua' || hitung[k]).map((k) => {
-          chipEls[k] = h('button', { type: 'button', class: 'chip', 'aria-pressed': String(k === filter), onclick: () => { filter = k; bangun(); } },
+          chipEls[k] = h('button', { type: 'button', class: 'chip', 'aria-pressed': String(k === filter), onclick: () => { filter = k; susun(); } },
             (k === 'semua' ? 'Semua' : JENIS_PENDEK[k]) + ' ', h('small', { text: String(hitung[k]) }));
           return chipEls[k];
         })),
-      h('button', { type: 'button', class: 'btn quiet', onclick: () => bangun(), text: 'Acak ulang' }));
+      h('button', { type: 'button', class: 'btn quiet', onclick: () => susun(), text: 'Acak ulang' }));
 
-    const kecil = window.matchMedia('(max-width: 760px)');
-    const wall = h('div', { class: 'wall', role: 'group', 'aria-label': 'Poster koleksi' });
+    // --- deretan poster besar (bertumpuk, bisa digeser) ---
+    const deck = h('div', { class: 'deck', tabindex: '0', role: 'group', 'aria-roledescription': 'carousel', 'aria-label': 'Poster koleksi. Pakai panah kiri dan kanan untuk berpindah.' });
+    const hitungEl = h('p', { class: 'deck-count', 'aria-hidden': 'true' });
+    const prevBtn = h('button', { type: 'button', class: 'deck-nav prev', 'aria-label': 'Poster sebelumnya', onclick: () => geser(-1) });
+    const nextBtn = h('button', { type: 'button', class: 'deck-nav next', 'aria-label': 'Poster berikutnya', onclick: () => geser(1) });
     const cap = h('section', { class: 'wrap cap', 'aria-live': 'polite' });
 
-    // --- keterangan di bawah dinding ---
-    function pilih(a) {
-      dipilih = a;
-      for (const t of wall.children) t.classList.toggle('on', t._a === a);
+    function tampil(a) {
       let status;
       if (a.status === 'ditonton' && a.jenis === 'game') status = `Sedang dimainkan${a.platform ? ' di ' + a.platform : ''}.`;
       else if (a.status === 'ditonton' && hasEpisodes(a)) status = `Lanjutkan dari episode ${a.ep + 1}${a.total ? ' dari ' + a.total : ''}.`;
@@ -278,33 +266,58 @@
           h('a', { class: 'btn primary', href: link(a), text: 'Buka detail' })));
     }
 
-    // --- dinding poster ---
-    function bangun() {
+    // Posisi tiap poster relatif ke yang di tengah: -2 -1 0 1 2 (melingkar).
+    function atur() {
+      const n = urut.length;
+      [...deck.children].forEach((el, i) => {
+        let d = (((i - idx) % n) + n) % n;
+        if (d > n / 2) d -= n;
+        const j = Math.abs(d);
+        el.style.setProperty('--d', d);
+        el.style.setProperty('--a', Math.min(j, 3));
+        el.style.zIndex = String(50 - j);
+        el.classList.toggle('on', d === 0);
+        el.classList.toggle('far', j > 2);
+        el.tabIndex = d === 0 ? 0 : -1;
+        el.setAttribute('aria-hidden', j > 2 ? 'true' : 'false');
+      });
+      tampil(urut[idx]);
+      hitungEl.textContent = `${idx + 1} dari ${n}`;
+      prevBtn.hidden = nextBtn.hidden = n < 2;
+    }
+    function geser(k) { idx = (idx + k + urut.length) % urut.length; atur(); }
+
+    function susun() {
       for (const [k, el] of Object.entries(chipEls)) el.setAttribute('aria-pressed', String(k === filter));
       const list = filter === 'semua' ? all : all.filter((a) => a.jenis === filter);
-      const { isi, cols, besar } = susunDinding(list, list.includes(next) ? next : null, kecil.matches);
-      wall.style.setProperty('--cols', cols);
-      wall.classList.toggle('reveal', pertama);
+      urut = [...(list.includes(next) ? [next] : []), ...acak(list.filter((a) => a !== next))].slice(0, 30);
+      idx = 0;
+      deck.classList.toggle('reveal', pertama);
       pertama = false;
-      wall.replaceChildren(...isi.map((a, i) => {
-        const t = h('button', {
-          type: 'button',
-          class: `tile j-${a.jenis}${besar.includes(i) ? ' big' : ''}`,
-          style: `--d:${Math.min(i * 22, 600)}ms`,
-          'aria-label': `${a.judul}, ${JENIS[a.jenis] || 'Anime'}, ${statusLabel(a.status, a.jenis)}`,
-          onclick: () => pilih(a),
-          onfocus: () => pilih(a),
-          onpointerenter: (e) => { if (e.pointerType === 'mouse') pilih(a); },
-        }, poster(a), a.status === 'ditonton' ? h('i', { class: 'tile-live', title: statusLabel(a.status, a.jenis) }) : null);
-        t._a = a;
-        return t;
-      }));
-      pilih(isi.includes(dipilih) ? dipilih : isi[0]);
+      deck.replaceChildren(...urut.map((a, i) => h('button', {
+        type: 'button',
+        class: `deck-card j-${a.jenis}`,
+        'aria-label': `${a.judul}, ${JENIS[a.jenis] || 'Anime'}, ${statusLabel(a.status, a.jenis)}`,
+        onclick: () => { if (i === idx) location.href = link(a); else { idx = i; atur(); } },
+      }, poster(a), a.status === 'ditonton' ? h('i', { class: 'tile-live', title: statusLabel(a.status, a.jenis) }) : null)));
+      atur();
     }
 
-    app.append(bar, h('div', { class: 'wrap' }, wall), cap);
-    bangun();
-    kecil.addEventListener('change', () => bangun());
+    deck.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') { e.preventDefault(); geser(-1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); geser(1); }
+    });
+    let sentuhX = null;
+    deck.addEventListener('pointerdown', (e) => { sentuhX = e.clientX; deck._geser = false; });
+    deck.addEventListener('pointerup', (e) => {
+      if (sentuhX == null) return;
+      const dx = e.clientX - sentuhX; sentuhX = null;
+      if (Math.abs(dx) > 45) { deck._geser = true; geser(dx < 0 ? 1 : -1); } // klik yang menyusul geseran diabaikan
+    });
+    deck.addEventListener('click', (e) => { if (deck._geser) { deck._geser = false; e.stopPropagation(); e.preventDefault(); } }, true);
+
+    app.append(bar, h('div', { class: 'wrap deck-wrap' }, deck, prevBtn, nextBtn, hitungEl), cap);
+    susun();
 
     // --- baru ditambahkan (urutan database = urutan ditambahkan) ---
     const baru = all.slice(-10).reverse();
