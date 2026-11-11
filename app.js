@@ -80,7 +80,7 @@
   // Poster TMDB/IGDB/Steam dimuat lewat penghubung, karena sebagian jaringan memblokir situs gambarnya.
   function coverSrc(u) {
     const base = apiBase();
-    if (base && /^https:\/\/(image\.tmdb\.org|images\.igdb\.com|[\w.]+\.steamstatic\.com|media\.rawg\.io)\//.test(u)) {
+    if (base && /^https:\/\/(image\.tmdb\.org|images\.igdb\.com|[\w.]+\.steamstatic\.com|media\.rawg\.io|giantbomb1\.cbsistatic\.com|www\.giantbomb\.com)\//.test(u)) {
       return base + '/api/gambar?u=' + encodeURIComponent(u);
     }
     return u;
@@ -195,12 +195,14 @@
     const rawgUsed = (window.ANIME || []).some((a) => /rawg\.io/.test(a.mal || ''));
     const igdbUsed = (window.ANIME || []).some((a) => /igdb\.com/.test(a.mal || ''));
     const steamUsed = (window.ANIME || []).some((a) => /steampowered\.com/.test(a.mal || ''));
+    const gbUsed = (window.ANIME || []).some((a) => /giantbomb\.com/.test(a.mal || ''));
     document.body.append(h('footer', {}, h('div', { class: 'wrap' },
       h('span', { text: note }),
       tmdb ? h('span', { text: 'Data film dan serial dari TMDB. Situs ini memakai API TMDB tetapi tidak didukung atau disertifikasi oleh TMDB.' }) : null,
       rawgUsed ? h('span', {}, 'Data game dari ', h('a', { href: 'https://rawg.io', target: '_blank', rel: 'noopener', text: 'RAWG' }), '.') : null,
       igdbUsed ? h('span', {}, 'Data game dari ', h('a', { href: 'https://www.igdb.com', target: '_blank', rel: 'noopener', text: 'IGDB' }), '.') : null,
-      steamUsed ? h('span', {}, 'Data game dari ', h('a', { href: 'https://store.steampowered.com', target: '_blank', rel: 'noopener', text: 'Steam' }), '.') : null)));
+      steamUsed ? h('span', {}, 'Data game dari ', h('a', { href: 'https://store.steampowered.com', target: '_blank', rel: 'noopener', text: 'Steam' }), '.') : null,
+      gbUsed ? h('span', {}, 'Data game dari ', h('a', { href: 'https://www.giantbomb.com', target: '_blank', rel: 'noopener', text: 'Giant Bomb' }), '.') : null)));
   }
 
   // ---------- Beranda ----------
@@ -588,7 +590,7 @@
           chipRow(a.genre),
           h('p', { class: a.sinopsis ? 'syn-full' : 'syn-full muted', text: a.sinopsis || 'Belum ada sinopsis. Isi kolom Sinopsis di Notion.' }),
           panel,
-          a.mal ? h('a', { class: 'btn', href: a.mal, target: '_blank', rel: 'noopener', text: /themoviedb\.org/.test(a.mal) ? 'Buka di TMDB' : /rawg\.io/.test(a.mal) ? 'Buka di RAWG' : /igdb\.com/.test(a.mal) ? 'Buka di IGDB' : /steampowered\.com/.test(a.mal) ? 'Buka di Steam' : 'Buka di MyAnimeList' }) : null))));
+          a.mal ? h('a', { class: 'btn', href: a.mal, target: '_blank', rel: 'noopener', text: /themoviedb\.org/.test(a.mal) ? 'Buka di TMDB' : /rawg\.io/.test(a.mal) ? 'Buka di RAWG' : /igdb\.com/.test(a.mal) ? 'Buka di IGDB' : /steampowered\.com/.test(a.mal) ? 'Buka di Steam' : /giantbomb\.com/.test(a.mal) ? 'Buka di Giant Bomb' : 'Buka di MyAnimeList' }) : null))));
   }
 
   // ---------- Tambah anime ----------
@@ -631,7 +633,7 @@
       throw new Error('Tidak bisa terhubung ke penghubung. Periksa apiUrl di config.js dan koneksi internetmu.');
     }
     const data = await res.json().catch(() => ({}));
-    if (res.ok) return data.results || [];
+    if (res.ok) { const list = data.results || []; list.catatan = data.catatan || ''; return list; }
     if (jenis === 'anime' && (res.status === 502 || res.status === 503 || res.status === 504)) {
       try { return await searchAniListBrowser(query); } catch { /* pakai pesan dari penghubung */ }
     }
@@ -764,7 +766,9 @@
       results.replaceChildren();
       try {
         const list = await searchAnime(term, api, pw.value, jenisSel.value);
-        notify(list.length ? '' : 'Tidak ada hasil. Coba judul lain atau tambah manual di bawah.');
+        notify(list.length
+          ? list.catatan || ''
+          : list.catatan ? 'Tidak ada hasil. ' + list.catatan : 'Tidak ada hasil. Coba judul lain atau tambah manual di bawah.');
         renderResults(list);
       } catch (err) {
         notify(err.message, 'err');
