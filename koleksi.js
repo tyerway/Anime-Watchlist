@@ -26,6 +26,11 @@
     return u;
   }
   const WARNA = ['#5b4a1e', '#4a2a5e', '#1f4a5e', '#5e2a2a', '#1f5e3a', '#3a2a5e', '#5e4a2a'];
+  // Daftar developer dari Steam bisa belasan studio: kartu hanya menampilkan dua pertama.
+  function ringkasDev(dev) {
+    const d = String(dev || '').split(',').map((x) => x.trim()).filter(Boolean);
+    return d.length > 2 ? `${d.slice(0, 2).join(', ')} +${d.length - 2} lainnya` : d.join(', ');
+  }
   const inisial = (j) => j.split(/[\s:;]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
   const warna = (j) => WARNA[[...j].reduce((a, c) => a + c.charCodeAt(0), 0) % WARNA.length];
 
@@ -130,8 +135,8 @@
       grid.replaceChildren(...potong.map((x) => h('li', {}, h('button', { type: 'button', class: 'k-card', onclick: () => detail(x) },
         gambar(x),
         h('div', { class: 'k-meta' }, h('b', { text: x.judul }),
-          h('span', { text: [x.tahun, x.developer].filter(Boolean).join(' · ') || ' ' }),
-          h('div', {}, x.lokasi.map((l) => h('span', { class: 'k-hd', text: l }))))))));
+          h('span', { class: 'k-sub1', title: x.developer || null, text: [x.tahun, ringkasDev(x.developer)].filter(Boolean).join(' · ') || '\u00a0' }),
+          h('div', { class: 'k-hds' }, x.lokasi.map((l) => h('span', { class: 'k-hd', text: l }))))))));
       lagi.hidden = r.length <= f.tampil;
     }
 
