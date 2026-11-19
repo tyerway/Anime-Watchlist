@@ -173,22 +173,57 @@ async function semuaHalaman(token, db) {
 
 // ---------- Unduh dari OneDrive ----------
 const b64url = (s) => Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\//g, '_').replace(/\+/g, '-');
-export async function unduhExcel(link, fetchFn = fetch) {
-  const calon = [
-    `https://api.onedrive.com/v1.0/shares/u!${b64url(link)}/root/content`,
-    link + (link.includes('?') ? '&' : '?') + 'download=1',
-  ];
+// Ikuti pengalihan link berbagi OneDrive baru (1drv.ms/x/c/...) sampai ketemu id berkas, lalu bangun alamat unduhan langsung.
+async function alamatUnduhanLangsung(link, fetchFn) {
+  let u = link;
+  for (let i = 0; i < 6; i++) {
+    const res = await fetchFn(u, { redirect: 'manual', headers: { 'User-Agent': UA } });
+    const lokasi = res.headers?.get?.('location');
+    if (!lokasi) return null;
+    u = new URL(lokasi, u).toString();
+    const q = new URL(u).searchParams;
+    const resid = q.get('resid') || q.get('id');
+    if (resid && (q.get('cid') || /\bcid=|\/personal\//i.test(u))) {
+      const cid = q.get('cid') || (u.match(/\/personal\/([0-9a-f]+)\//i) || [])[1];
+      const hasil = new URL('https://onedrive.live.com/download');
+      if (cid) hasil.searchParams.set('cid', cid);
+      hasil.searchParams.set('resid', resid);
+      if (q.get('authkey')) hasil.searchParams.set('authkey', q.get('authkey'));
+      return hasil.toString();
+    }
+  }
+  return null;
+}
+
+export async function unduhExcel(linkMentah, fetchFn = fetch) {
+  const link = String(linkMentah || '').trim().replace(/^["'<]+|["'>]+$/g, '').trim(); // buang spasi, baris baru, dan tanda kutip yang ikut tersalin
+  if (!/^https:\/\/(1drv\.ms|onedrive\.live\.com|[\w-]+\.sharepoint\.com|[\w-]+-my\.sharepoint\.com)\//i.test(link)) {
+    throw new Error('LIST_GAME_URL bukan link berbagi OneDrive (harus diawali https://1drv.ms/ atau https://onedrive.live.com/). Salin ulang link ke secret tanpa tanda kutip.');
+  }
   const galat = [];
-  for (const u of calon) {
+  const coba = async (u, nama) => {
     try {
       const res = await fetchFn(u, { redirect: 'follow', headers: { 'User-Agent': UA } });
-      if (!res.ok) { galat.push(`${new URL(u).host}: kode ${res.status}`); continue; }
+      if (!res.ok) { galat.push(`${nama}: kode ${res.status}`); return null; }
       const buf = Buffer.from(await res.arrayBuffer());
       if (buf.length > 100 && buf[0] === 0x50 && buf[1] === 0x4b) return buf; // "PK": berkas xlsx (zip)
-      galat.push(`${new URL(u).host}: balasan bukan berkas Excel`);
-    } catch (e) { galat.push(`${new URL(u).host}: ${e.message}`); }
+      galat.push(`${nama}: balasan bukan berkas Excel`);
+    } catch (e) { galat.push(`${nama}: ${e.message}`); }
+    return null;
+  };
+  let buf = await coba(`https://api.onedrive.com/v1.0/shares/u!${b64url(link)}/root/content`, 'api.onedrive.com');
+  if (!buf) buf = await coba(link + (link.includes('?') ? '&' : '?') + 'download=1', '1drv.ms');
+  if (!buf) {
+    let langsung = null;
+    try { langsung = await alamatUnduhanLangsung(link, fetchFn); } catch (e) { galat.push(`pengalihan: ${e.message}`); }
+    if (langsung) buf = await coba(langsung, 'onedrive.live.com');
+    else galat.push('pengalihan: id berkas tidak ditemukan');
   }
-  throw new Error('Tidak bisa mengunduh List Game.xlsx dari OneDrive (' + galat.join('; ') + '). Pastikan setelan berbagi "Siapa saja dengan link dapat melihat".');
+  if (buf) return buf;
+  const butuhLogin = galat.some((g) => /kode 40[13]/.test(g));
+  throw new Error('Tidak bisa mengunduh List Game.xlsx dari OneDrive (' + galat.join('; ') + '). ' + (butuhLogin
+    ? 'OneDrive meminta login: buat ulang link lewat Bagikan > Siapa saja dengan link, salin, lalu perbarui secret LIST_GAME_URL (untuk file di folder bersama atau akun kantor, pakai Unduh langsung dari menu "Embed" atau pindahkan berkas ke OneDrive pribadi).'
+    : 'Pastikan setelan berbagi "Siapa saja dengan link dapat melihat".'));
 }
 
 async function bacaExcel(buf, sheet) {
