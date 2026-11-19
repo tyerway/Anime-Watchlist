@@ -1,0 +1,1 @@
+{ "name": "koleksi-sync", "private": true, "type": "module", "dependencies": { "read-excel-file": "^5.8.8" } }

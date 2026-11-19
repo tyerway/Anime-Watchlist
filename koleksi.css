@@ -1,0 +1,49 @@
+/* Halaman Koleksi Game: berdiri sendiri, hanya meminjam warna dan font dari style.css. */
+.k-body { --k-aksen: var(--aksen, #48d1cc); --k-aksen-teks: var(--aksen-teks, #04302e); }
+.k-head { padding: 28px 0 14px; }
+.k-head h1 { margin: 0 0 4px; font-size: clamp(1.7rem, 3.4vw, 2.4rem); letter-spacing: -.03em; }
+.k-sub { margin: 0; color: var(--muted); font-size: .95rem; }
+.k-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 10px; align-items: center; margin: 14px 0 12px; }
+.k-tools input, .k-tools select, .k-gate input[type=password] {
+  font: inherit; font-size: .95rem; color: var(--text); background: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; min-width: 0; }
+.k-tools input:focus, .k-tools select:focus, .k-gate input:focus { outline: 2px solid var(--k-aksen); outline-offset: 1px; }
+.k-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
+.k-chips button { font: inherit; font-size: .85rem; padding: 4px 13px; border-radius: 99px; border: 1px solid var(--line); background: var(--panel-2); color: var(--muted); cursor: pointer; }
+.k-chips button small { opacity: .75; margin-left: 4px; }
+.k-chips button[aria-pressed="true"] { background: var(--k-aksen); border-color: var(--k-aksen); color: var(--k-aksen-teks); font-weight: 700; }
+.k-info { color: var(--muted); font-size: .9rem; margin: 0 0 14px; }
+.k-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 16px; padding: 0 0 20px; list-style: none; margin: 0; }
+.k-card { display: flex; flex-direction: column; width: 100%; padding: 0; text-align: left; font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; cursor: pointer; }
+.k-card:hover, .k-card:focus-visible { border-color: var(--k-aksen); }
+.k-cover { position: relative; aspect-ratio: 2 / 3; background: var(--panel-2); overflow: hidden; }
+.k-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.k-ph { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 700; font-size: 2rem; letter-spacing: .02em; color: rgba(255,255,255,.85); }
+.k-meta { padding: 10px 12px 12px; display: grid; gap: 4px; }
+.k-meta b { font-size: .95rem; line-height: 1.25; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.k-meta span { font-size: .8rem; color: var(--muted); }
+.k-hd { display: inline-block; font-size: .7rem; padding: 1px 8px; border-radius: 99px; border: 1px solid var(--line); color: #c9d0e8; margin: 2px 4px 0 0; }
+.k-more { display: block; margin: 8px auto 40px; }
+.k-empty { padding: 50px 0; text-align: center; color: var(--muted); }
+.k-gate { max-width: 420px; margin: 60px auto; padding: 22px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; display: grid; gap: 12px; }
+.k-gate h1 { margin: 0; font-size: 1.4rem; }
+.k-gate label.k-ingat { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: .9rem; }
+.k-gate .k-err, .k-err { color: #ff9aa8; font-size: .9rem; min-height: 1.2em; margin: 0; }
+.k-btn { font: inherit; font-size: .95rem; padding: 9px 18px; border-radius: 8px; border: 1px solid var(--k-aksen); background: var(--k-aksen); color: var(--k-aksen-teks); font-weight: 700; cursor: pointer; }
+.k-btn.quiet { background: none; color: var(--text); border-color: var(--line); font-weight: 500; }
+.k-btn:hover { filter: brightness(1.08); }
+.k-btn:disabled { opacity: .5; cursor: progress; }
+dialog.k-dlg { width: min(760px, calc(100vw - 24px)); max-height: calc(100vh - 32px); padding: 0; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: auto; }
+dialog.k-dlg::backdrop { background: rgba(5, 8, 15, .72); }
+.k-dbody { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 20px; padding: 20px; }
+.k-dbody .k-cover { border-radius: 8px; align-self: start; }
+.k-dbody h2 { margin: 0 0 6px; font-size: 1.5rem; letter-spacing: -.02em; }
+.k-dbody p { margin: 10px 0; font: 1rem/1.65 var(--serif); color: #d6dbee; }
+.k-dbody dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 12px 0; font-size: .92rem; }
+.k-dbody dt { color: var(--muted); } .k-dbody dd { margin: 0; }
+.k-dbody a { color: var(--k-aksen); }
+.k-dclose { position: sticky; top: 8px; float: right; margin: 8px 8px 0 0; z-index: 2; }
+@media (max-width: 640px) {
+  .k-tools { grid-template-columns: 1fr 1fr; } .k-tools input { grid-column: 1 / -1; }
+  .k-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 12px; }
+  .k-dbody { grid-template-columns: 1fr; } .k-dbody .k-cover { max-width: 180px; }
+}
