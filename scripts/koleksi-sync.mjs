@@ -173,26 +173,33 @@ async function semuaHalaman(token, db) {
 
 // ---------- Unduh dari OneDrive ----------
 const b64url = (s) => Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\//g, '_').replace(/\+/g, '-');
-// Ikuti pengalihan link berbagi OneDrive baru (1drv.ms/x/c/...) sampai ketemu id berkas, lalu bangun alamat unduhan langsung.
-async function alamatUnduhanLangsung(link, fetchFn) {
+// Ikuti pengalihan link berbagi OneDrive baru (1drv.ms/x/c/... -> onedrive.live.com/:x:/g/personal/...?redeem=...)
+// dan kumpulkan alamat unduhan yang mungkin. Parameter download=1 hilang saat pengalihan, jadi ditambahkan lagi di ujung.
+const UA_BROWSER = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
+async function calonUnduhanLangsung(link, fetchFn) {
+  const calon = [];
   let u = link;
   for (let i = 0; i < 6; i++) {
-    const res = await fetchFn(u, { redirect: 'manual', headers: { 'User-Agent': UA } });
+    const res = await fetchFn(u, { redirect: 'manual', headers: { 'User-Agent': UA_BROWSER } });
     const lokasi = res.headers?.get?.('location');
-    if (!lokasi) return null;
+    if (!lokasi) break;
     u = new URL(lokasi, u).toString();
     const q = new URL(u).searchParams;
     const resid = q.get('resid') || q.get('id');
     if (resid && (q.get('cid') || /\bcid=|\/personal\//i.test(u))) {
       const cid = q.get('cid') || (u.match(/\/personal\/([0-9a-f]+)\//i) || [])[1];
-      const hasil = new URL('https://onedrive.live.com/download');
-      if (cid) hasil.searchParams.set('cid', cid);
-      hasil.searchParams.set('resid', resid);
-      if (q.get('authkey')) hasil.searchParams.set('authkey', q.get('authkey'));
-      return hasil.toString();
+      const d = new URL('https://onedrive.live.com/download');
+      if (cid) d.searchParams.set('cid', cid);
+      d.searchParams.set('resid', resid);
+      if (q.get('authkey')) d.searchParams.set('authkey', q.get('authkey'));
+      calon.push(d.toString());
+    }
+    if (/onedrive\.live\.com/i.test(u)) {
+      calon.push(u + (u.includes('?') ? '&' : '?') + 'download=1');
+      calon.push(`https://api.onedrive.com/v1.0/shares/u!${b64url(u)}/root/content`);
     }
   }
-  return null;
+  return [...new Set(calon)];
 }
 
 export async function unduhExcel(linkMentah, fetchFn = fetch) {
@@ -203,7 +210,7 @@ export async function unduhExcel(linkMentah, fetchFn = fetch) {
   const galat = [];
   const coba = async (u, nama) => {
     try {
-      const res = await fetchFn(u, { redirect: 'follow', headers: { 'User-Agent': UA } });
+      const res = await fetchFn(u, { redirect: 'follow', headers: { 'User-Agent': UA_BROWSER } });
       if (!res.ok) { galat.push(`${nama}: kode ${res.status}`); return null; }
       const buf = Buffer.from(await res.arrayBuffer());
       if (buf.length > 100 && buf[0] === 0x50 && buf[1] === 0x4b) return buf; // "PK": berkas xlsx (zip)
@@ -214,10 +221,10 @@ export async function unduhExcel(linkMentah, fetchFn = fetch) {
   let buf = await coba(`https://api.onedrive.com/v1.0/shares/u!${b64url(link)}/root/content`, 'api.onedrive.com');
   if (!buf) buf = await coba(link + (link.includes('?') ? '&' : '?') + 'download=1', '1drv.ms');
   if (!buf) {
-    let langsung = null;
-    try { langsung = await alamatUnduhanLangsung(link, fetchFn); } catch (e) { galat.push(`pengalihan: ${e.message}`); }
-    if (langsung) buf = await coba(langsung, 'onedrive.live.com');
-    else galat.push('pengalihan: id berkas tidak ditemukan');
+    let lain = [];
+    try { lain = await calonUnduhanLangsung(link, fetchFn); } catch (e) { galat.push(`pengalihan: ${e.message}`); }
+    if (!lain.length) galat.push('pengalihan: alamat tujuan tidak ditemukan');
+    for (const u of lain) { buf = await coba(u, 'onedrive.live.com'); if (buf) break; }
   }
   if (buf) return buf;
   const butuhLogin = galat.some((g) => /kode 40[13]/.test(g));
@@ -249,8 +256,11 @@ export async function jalankan(env, deps = {}) {
   else {
     let buf = deps.excel;
     if (!buf && env.BERKAS) buf = await readFile(env.BERKAS);
+    if (!buf && !env.LIST_GAME_URL) {
+      for (const f of ['data/List Game.xlsx', 'data/List_Game.xlsx']) { try { buf = await readFile(f); log('Memakai berkas di repo: ' + f); break; } catch { /* coba berikutnya */ } }
+    }
     if (!buf) {
-      if (!env.LIST_GAME_URL) throw new Error('Isi LIST_GAME_URL atau beri berkas .xlsx sebagai argumen.');
+      if (!env.LIST_GAME_URL) throw new Error('Isi LIST_GAME_URL, atau taruh berkas di repo sebagai data/List Game.xlsx, atau beri berkas .xlsx sebagai argumen.');
       buf = await unduhExcel(env.LIST_GAME_URL);
     }
     ({ rows, sheet } = await bacaExcel(buf, env.SHEET_NAME || 'List Game'));
