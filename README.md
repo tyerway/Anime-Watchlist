@@ -145,20 +145,38 @@ Buka `index.html` langsung di browser. Tanpa `apiUrl`, yang tampil adalah data c
 
 Halaman `koleksi.html` adalah database game di hardisk eksternalmu. Isinya terpisah dari watchlist: database Notion sendiri ("Koleksi Game"), halaman sendiri (`koleksi.html`, `koleksi.js`, `koleksi.css`), dan terkunci kata sandi (sama dengan halaman Tambah). Tautan "Koleksi" ada di menu atas.
 
-**Alur otomatis:** kamu mengubah `List Game.xlsx` di OneDrive. GitHub Actions ("Sinkron koleksi game", tiap 6 jam) mengunduhnya, membersihkan nama folder jadi judul game (tanpa `MULTi13`, nama grup rilis, `Update v...`, dan sebagainya), lalu:
+### Cara memperbarui koleksi (lakukan tiap kali Excel berubah)
 
-- judul baru ditambahkan ke Notion dan dicari datanya di Steam (cadangan Wikipedia): deskripsi, cover, developer, genre, tahun;
-- baris yang sudah ada hanya diperbarui kolom Lokasi (hardisk), Edisi, dan Berkas;
-- judul yang dihapus dari Excel tidak dihapus dari Notion, hanya dicentang "Ada di Excel" = tidak;
-- nama folder asli (kolom Berkas) hanya ada di Notion, tidak dikirim ke situs.
+OneDrive tidak mengizinkan program mengunduh link berbagi modelnya yang baru, jadi berkas Excel disimpan di repo GitHub dan **harus diunggah ulang secara manual setiap kali kamu mengubah `List Game.xlsx`**.
 
-**Memperbaiki data yang salah:** buka baris itu di Notion. Cara paling mudah: isi **Steam ID** (angka di alamat toko Steam, `store.steampowered.com/app/ANGKA`), lalu sinkron berikutnya mengambil data yang benar. Untuk mengedit deskripsi atau cover sendiri, ubah lalu centang **Dikunci** supaya tidak ditimpa. Judul yang tidak ketemu otomatis bertanda Sumber = "Tidak ketemu".
+1. Ubah `List Game.xlsx` di OneDrive seperti biasa (tambah judul, pindah hardisk, dan sebagainya).
+2. Unduh salinan terbarunya ke komputer. Namanya harus tetap **`List Game.xlsx`** (huruf besar-kecil dan spasinya sama).
+3. Buka repo `Anime-Watchlist` di GitHub, masuk ke folder **`data`**.
+4. Klik **Add file**, lalu **Upload files**, seret `List Game.xlsx`, lalu klik **Commit changes**. GitHub otomatis menimpa berkas lama dengan nama yang sama.
+5. Buka tab **Actions**, pilih **Sinkron koleksi game**, klik **Run workflow**, lalu **Run workflow** lagi. (Tidak mau menekan tombol: tunggu saja, sinkron berjalan sendiri tiap 6 jam.)
+6. Setelah workflow berwarna hijau, muat ulang halaman Koleksi dengan Ctrl+F5.
 
-**Pemasangan:**
-1. Notion: buka database "Koleksi Game", klik ... > Connections > tambahkan integrasi watchlist-mu. Salin ID database dari alamatnya (32 karakter sebelum `?v=`).
-2. Cloudflare Worker `anime-api`: tempel `worker.js` terbaru, tambahkan variabel `KOLEKSI_DATABASE_ID` (Text), lalu Deploy.
-3. GitHub > Settings > Secrets and variables > Actions: tambahkan `KOLEKSI_DATABASE_ID` dan `LIST_GAME_URL` (link berbagi OneDrive, setelan "Siapa saja dengan link dapat melihat"). `NOTION_TOKEN` sudah ada.
-4. Upload ke GitHub: `koleksi.html`, `koleksi.js`, `koleksi.css`, `app.js`, folder `scripts/` (termasuk `package.json`), dan `.github/workflows/koleksi-game.yml`. Jangan timpa `config.js`.
-5. GitHub > Actions > "Sinkron koleksi game" > Run workflow. Eksekusi pertama mencari data maksimal 250 judul; jalankan lagi beberapa kali sampai semua terisi (Steam membatasi kecepatan).
+Kalau lupa mengunggah ulang, tidak ada yang rusak: Notion dan halaman Koleksi hanya menampilkan data dari unggahan terakhir.
 
-Tanpa OneDrive: `node scripts/koleksi-sync.mjs "List Game.xlsx"` dengan `NOTION_TOKEN` dan `KOLEKSI_DATABASE_ID` di environment.
+Judul baru dicari datanya 250 judul per putaran, jadi kalau Excel-nya berubah banyak, jalankan workflow dua atau tiga kali sampai log menulis `0 baru` dan semua kartu punya cover.
+
+### Yang dilakukan sinkron
+
+- Membaca `data/List Game.xlsx`, membersihkan nama folder jadi judul game (tanpa `MULTi13`, nama grup rilis, `Update v...`, dan sebagainya), lalu menggabungkan edisi, update, dan salinan di beberapa hardisk jadi satu kartu.
+- Judul baru ditambahkan ke Notion dan dicari datanya di Steam (cadangan Wikipedia): deskripsi, cover, developer, genre, tahun.
+- Baris yang sudah ada hanya diperbarui kolom Lokasi (hardisk), Edisi, dan Berkas.
+- Judul yang dihapus dari Excel tidak dihapus dari Notion, hanya dicentang "Ada di Excel" = tidak (bisa difilter lewat "Tidak ada lagi di Excel" di halaman Koleksi).
+- Nama folder asli (kolom Berkas) hanya ada di Notion, tidak dikirim ke situs.
+
+### Memperbaiki data yang salah atau kosong
+
+Buka baris itu di Notion. Cara paling mudah: isi **Steam ID** (angka di alamat toko Steam, `store.steampowered.com/app/ANGKA`), lalu sinkron berikutnya mengambil data yang benar. Untuk mengedit deskripsi atau cover sendiri, ubah lalu centang **Dikunci** supaya tidak ditimpa. Judul yang tidak ketemu otomatis bertanda Sumber = "Tidak ketemu".
+
+### Pemasangan awal (sudah kamu lakukan)
+
+1. Notion: database "Koleksi Game" tersambung ke integrasi watchlist (... > Connections).
+2. Cloudflare Worker `anime-api`: variabel `KOLEKSI_DATABASE_ID` terisi.
+3. GitHub > Settings > Secrets and variables > Actions: secret `KOLEKSI_DATABASE_ID` dan `NOTION_TOKEN` ada. Secret `LIST_GAME_URL` **jangan diisi** (kalau terisi, skrip mencoba OneDrive dulu dan gagal).
+4. File yang harus ada di repo: `koleksi.html`, `koleksi.js`, `koleksi.css`, `app.js`, folder `scripts/` (`koleksi-sync.mjs`, `koleksi-judul.mjs`, `package.json`), `.github/workflows/koleksi-game.yml`, dan `data/List Game.xlsx`.
+
+Tanpa GitHub (dari komputer): `node scripts/koleksi-sync.mjs "List Game.xlsx"` dengan `NOTION_TOKEN` dan `KOLEKSI_DATABASE_ID` di environment.
