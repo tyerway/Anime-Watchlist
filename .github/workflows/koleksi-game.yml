@@ -1,0 +1,37 @@
+name: Sinkron koleksi game
+
+on:
+  schedule:
+    - cron: '41 */6 * * *'
+  workflow_dispatch:
+    inputs:
+      ulang_tidak_ketemu:
+        description: 'Cari ulang judul yang sebelumnya "Tidak ketemu" (isi 1)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: koleksi-game
+  cancel-in-progress: false
+
+jobs:
+  sinkron:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Pasang pustaka pembaca Excel
+        run: npm install --prefix scripts --no-audit --no-fund
+      - name: Sinkron List Game.xlsx ke Notion
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+          KOLEKSI_DATABASE_ID: ${{ secrets.KOLEKSI_DATABASE_ID }}
+          LIST_GAME_URL: ${{ secrets.LIST_GAME_URL }}
+          ULANG_TIDAK_KETEMU: ${{ github.event.inputs.ulang_tidak_ketemu }}
+        run: node scripts/koleksi-sync.mjs
