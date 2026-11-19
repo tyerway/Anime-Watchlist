@@ -168,6 +168,7 @@
       ['daftar.html?jenis=game', 'Game', 'list:game'],
     ];
     if (apiBase()) nav.push(['tambah.html', 'Tambah', 'add']);
+    if (apiBase()) nav.push(['koleksi.html', 'Koleksi', 'koleksi']);
     const current = page === 'list' ? 'list:' + (JENIS[jenisParam] ? jenisParam : 'semua')
       : page === 'detail' ? 'list:semua' : page;
     $('#top').append(h('div', { class: 'wrap top-in' },
