@@ -140,3 +140,25 @@ Google memperbarui kalender langganan tiap beberapa jam sampai sekitar sehari, j
 ## Mencoba di komputer
 
 Buka `index.html` langsung di browser. Tanpa `apiUrl`, yang tampil adalah data contoh di `data.js`.
+
+## Koleksi Game (halaman terpisah)
+
+Halaman `koleksi.html` adalah database game di hardisk eksternalmu. Isinya terpisah dari watchlist: database Notion sendiri ("Koleksi Game"), halaman sendiri (`koleksi.html`, `koleksi.js`, `koleksi.css`), dan terkunci kata sandi (sama dengan halaman Tambah). Tautan "Koleksi" ada di menu atas.
+
+**Alur otomatis:** kamu mengubah `List Game.xlsx` di OneDrive. GitHub Actions ("Sinkron koleksi game", tiap 6 jam) mengunduhnya, membersihkan nama folder jadi judul game (tanpa `MULTi13`, nama grup rilis, `Update v...`, dan sebagainya), lalu:
+
+- judul baru ditambahkan ke Notion dan dicari datanya di Steam (cadangan Wikipedia): deskripsi, cover, developer, genre, tahun;
+- baris yang sudah ada hanya diperbarui kolom Lokasi (hardisk), Edisi, dan Berkas;
+- judul yang dihapus dari Excel tidak dihapus dari Notion, hanya dicentang "Ada di Excel" = tidak;
+- nama folder asli (kolom Berkas) hanya ada di Notion, tidak dikirim ke situs.
+
+**Memperbaiki data yang salah:** buka baris itu di Notion. Cara paling mudah: isi **Steam ID** (angka di alamat toko Steam, `store.steampowered.com/app/ANGKA`), lalu sinkron berikutnya mengambil data yang benar. Untuk mengedit deskripsi atau cover sendiri, ubah lalu centang **Dikunci** supaya tidak ditimpa. Judul yang tidak ketemu otomatis bertanda Sumber = "Tidak ketemu".
+
+**Pemasangan:**
+1. Notion: buka database "Koleksi Game", klik ... > Connections > tambahkan integrasi watchlist-mu. Salin ID database dari alamatnya (32 karakter sebelum `?v=`).
+2. Cloudflare Worker `anime-api`: tempel `worker.js` terbaru, tambahkan variabel `KOLEKSI_DATABASE_ID` (Text), lalu Deploy.
+3. GitHub > Settings > Secrets and variables > Actions: tambahkan `KOLEKSI_DATABASE_ID` dan `LIST_GAME_URL` (link berbagi OneDrive, setelan "Siapa saja dengan link dapat melihat"). `NOTION_TOKEN` sudah ada.
+4. Upload ke GitHub: `koleksi.html`, `koleksi.js`, `koleksi.css`, `app.js`, folder `scripts/` (termasuk `package.json`), dan `.github/workflows/koleksi-game.yml`. Jangan timpa `config.js`.
+5. GitHub > Actions > "Sinkron koleksi game" > Run workflow. Eksekusi pertama mencari data maksimal 250 judul; jalankan lagi beberapa kali sampai semua terisi (Steam membatasi kecepatan).
+
+Tanpa OneDrive: `node scripts/koleksi-sync.mjs "List Game.xlsx"` dengan `NOTION_TOKEN` dan `KOLEKSI_DATABASE_ID` di environment.
