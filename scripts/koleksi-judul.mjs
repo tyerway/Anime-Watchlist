@@ -6,7 +6,7 @@ const RE_GRUP = new RegExp(`[-\\s](?:${GRUP})$`, 'i');
 const EDISI_KATA = 'Deluxe|Gold|Complete|Premium|Ultimate|Digital|Standard|Definitive|Anniversary|Collectors?|Master Assassin|Jackdaw|Apex|Devout|Explorer|El Prez|Grand Slam|Game of the Year|GOTY|Directors? Cut|Enhanced|Special|Legendary|Royal|Limited|Founders?|Launch|Day One|Expanded|Platinum|Supreme|Imperial|Season Pass|Unrated|Bonus|Anniversary';
 const RE_EDISI = new RegExp(`\\s+((?:(?:${EDISI_KATA})\\s+)+(?:Edition|Version|Collection)?|(?:${EDISI_KATA})\\s+Edition|Edition)$`, 'i');
 
-export const normal = (s) => String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
+export const normal = (s) => String(s || '').replace(/[™®©℠]/g, '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
   .replace(/&/g, ' and ').replace(/['’`]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 
 export function bersihJudul(raw) {
