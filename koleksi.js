@@ -34,22 +34,31 @@
   const inisial = (j) => j.split(/[\s:;]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
   const warna = (j) => WARNA[[...j].reduce((a, c) => a + c.charCodeAt(0), 0) % WARNA.length];
 
-  // Cover: potret Steam -> header Steam -> kotak inisial.
+  // Cover: potret Steam -> banner lanskap -> kotak inisial. Gambar lanskap diletakkan utuh di atas latar kabur dari gambar yang sama.
   function gambar(item, kelas = '') {
     const kotak = h('div', { class: 'k-cover ' + kelas });
     const ph = h('div', { class: 'k-ph', text: inisial(item.judul), style: `background:linear-gradient(160deg, ${warna(item.judul)}, #10141f)`, 'aria-hidden': 'true' });
     kotak.append(ph);
-    if (!item.cover) return kotak;
-    const img = h('img', { alt: '', loading: 'lazy', decoding: 'async', src: coverSrc(item.cover) });
-    let coba = 0;
-    img.addEventListener('error', () => {
-      const header = item.cover.replace(/library_600x900\.jpg$/, 'header.jpg');
-      if (coba++ === 0 && header !== item.cover) img.src = coverSrc(header);
-      else img.remove();
+    const urut = [item.cover, item.banner, item.cover && item.cover.replace(/library_600x900\.jpg$/, 'header.jpg')].filter((u, i, a) => u && a.indexOf(u) === i);
+    if (!urut.length) return kotak;
+    let n = 0;
+    const img = h('img', { alt: '', loading: 'lazy', decoding: 'async', src: coverSrc(urut[0]) });
+    img.addEventListener('error', () => { if (++n < urut.length) img.src = coverSrc(urut[n]); else img.remove(); });
+    img.addEventListener('load', () => {
+      ph.remove();
+      if (img.naturalWidth > img.naturalHeight * 1.15) { kotak.classList.add('lanskap'); kotak.style.setProperty('--bg', `url("${img.currentSrc.replace(/"/g, '%22')}")`); }
     });
-    img.addEventListener('load', () => { ph.remove(); });
     kotak.append(img);
     return kotak;
+  }
+
+  const miniatur = (u) => u.replace(/\.1920x1080\.jpg$/, '.600x338.jpg');
+  // "OS: Windows 10" -> daftar label dan nilai; baris tanpa label tetap tampil.
+  function daftarSpek(teks) {
+    return h('dl', { class: 'k-spek' }, String(teks).split('\n').flatMap((baris) => {
+      const i = baris.indexOf(':');
+      return i > 0 && i < 28 ? [h('dt', { text: baris.slice(0, i) }), h('dd', { text: baris.slice(i + 1).trim() })] : [h('dt', { text: '' }), h('dd', { text: baris })];
+    }));
   }
 
   let semua = [];
@@ -141,15 +150,57 @@
     }
 
     function detail(x) {
-      const baris = [['Developer', x.developer], ['Tahun', x.tahun], ['Genre', x.genre.join(', ')], ['Edisi', x.edisi], ['Hardisk', x.lokasi.join(', ')],
-        ['Sumber data', x.sumber === 'Tidak ketemu' ? 'Belum ketemu otomatis' : x.sumber], ['Catatan', x.catatan]].filter(([, v]) => v);
+      const info = [['Judul', x.edisi ? `${x.judul} (${x.edisi})` : x.judul], ['Genre', x.genre.join(', ')], ['Developer', x.developer], ['Publisher', x.publisher],
+        ['Tanggal rilis', x.rilis || x.tahun], ['Hardisk', x.lokasi.join(', ')], ['Sumber data', x.sumber === 'Tidak ketemu' ? 'Belum ketemu otomatis' : x.sumber], ['Catatan', x.catatan]].filter(([, v]) => v);
+      const bannerUrl = x.banner || x.cover;
+      const banner = bannerUrl ? h('img', { class: 'k-banner', alt: '', decoding: 'async', src: coverSrc(bannerUrl) }) : null;
+      if (banner) banner.addEventListener('error', () => banner.remove());
+
+      // Jendela besar untuk screenshot
+      let idx = 0;
+      const viewer = h('div', { class: 'k-viewer', hidden: true, role: 'dialog', 'aria-label': 'Screenshot' });
+      const vImg = h('img', { alt: '' });
+      const tutupViewer = () => { viewer.hidden = true; vImg.removeAttribute('src'); };
+      const tampilVw = (i) => { idx = (i + x.screenshots.length) % x.screenshots.length; vImg.src = coverSrc(x.screenshots[idx]); vCount.textContent = `${idx + 1} / ${x.screenshots.length}`; viewer.hidden = false; };
+      const vCount = h('span', { class: 'k-vcount' });
+      viewer.append(vImg, vCount,
+        h('button', { type: 'button', class: 'k-vbtn k-vprev', 'aria-label': 'Sebelumnya', text: '‹', onclick: (e) => { e.stopPropagation(); tampilVw(idx - 1); } }),
+        h('button', { type: 'button', class: 'k-vbtn k-vnext', 'aria-label': 'Berikutnya', text: '›', onclick: (e) => { e.stopPropagation(); tampilVw(idx + 1); } }),
+        h('button', { type: 'button', class: 'k-vbtn k-vclose', 'aria-label': 'Tutup gambar', text: '✕', onclick: (e) => { e.stopPropagation(); tutupViewer(); } }));
+      viewer.addEventListener('click', tutupViewer);
+
+      const tab = [];
+      tab.push(['deskripsi', 'Deskripsi', () => h('div', { class: 'k-teks' },
+        x.deskripsi ? h('p', { text: x.deskripsi }) : h('p', { class: 'k-sub', text: 'Belum ada deskripsi. Isi manual di Notion, atau isi kolom Steam ID lalu sinkron berikutnya akan mengambilnya.' }),
+        x.tentang ? h('p', { text: x.tentang }) : null)]);
+      if (x.screenshots.length) tab.push(['screenshot', `Screenshot (${x.screenshots.length})`, () => h('div', { class: 'k-shots' }, x.screenshots.map((u, i) =>
+        h('button', { type: 'button', class: 'k-shot', 'aria-label': `Buka screenshot ${i + 1}`, onclick: () => tampilVw(i) }, h('img', { alt: '', loading: 'lazy', decoding: 'async', src: coverSrc(miniatur(u)) }))))]);
+      if (x.spekMin || x.spekRek) tab.push(['spek', 'System Requirements', () => h('div', { class: 'k-speks' },
+        x.spekMin ? h('section', {}, h('h3', { text: 'Minimum' }), daftarSpek(x.spekMin)) : null,
+        x.spekRek ? h('section', {}, h('h3', { text: 'Disarankan' }), daftarSpek(x.spekRek)) : null)]);
+
+      const panel = h('div', { class: 'k-panel', role: 'tabpanel' });
+      const bar = h('div', { class: 'k-tabs', role: 'tablist' });
+      const pilih = (id) => {
+        for (const b of bar.children) b.setAttribute('aria-selected', String(b.dataset.id === id));
+        panel.replaceChildren(tab.find((t) => t[0] === id)[2]());
+      };
+      for (const [id, label] of tab) bar.append(h('button', { type: 'button', role: 'tab', 'data-id': id, 'aria-selected': 'false', text: label, onclick: () => pilih(id) }));
+
       dlg.replaceChildren(
         h('button', { type: 'button', class: 'k-btn quiet k-dclose', text: 'Tutup', onclick: () => dlg.close() }),
-        h('div', { class: 'k-dbody' }, gambar(x),
-          h('div', {}, h('h2', { text: x.judul }),
-            x.deskripsi ? h('p', { text: x.deskripsi }) : h('p', { class: 'k-sub', text: 'Belum ada deskripsi. Isi manual di Notion, atau isi kolom Steam ID lalu sinkron berikutnya akan mengambilnya.' }),
-            h('dl', {}, baris.flatMap(([k, v]) => [h('dt', { text: k }), h('dd', { text: String(v) })])),
-            x.tautan ? h('a', { href: x.tautan, target: '_blank', rel: 'noopener noreferrer', text: 'Buka halaman sumber' }) : null)));
+        h('article', { class: 'k-post' },
+          h('p', { class: 'k-kat' }, x.genre.length ? x.genre.join(', ') : 'Koleksi Game'),
+          h('h2', { text: x.judul }),
+          banner,
+          h('dl', { class: 'k-info2' }, info.flatMap(([k, v]) => [h('dt', { text: k }), h('dd', { text: String(v) })])),
+          x.tautan ? h('a', { class: 'k-sumber', href: x.tautan, target: '_blank', rel: 'noopener noreferrer', text: 'Buka halaman sumber' }) : null,
+          bar, panel),
+        viewer);
+      pilih('deskripsi');
+      dlg.oncancel = (e) => { if (!viewer.hidden) { e.preventDefault(); tutupViewer(); } };
+      dlg.onkeydown = (e) => { if (viewer.hidden || !x.screenshots.length) return; if (e.key === 'ArrowLeft') tampilVw(idx - 1); else if (e.key === 'ArrowRight') tampilVw(idx + 1); };
+      dlg.scrollTop = 0;
       if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
     }
 
