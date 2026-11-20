@@ -168,6 +168,15 @@ Judul baru dicari datanya 250 judul per putaran, jadi kalau Excel-nya berubah ba
 - Judul yang dihapus dari Excel tidak dihapus dari Notion, hanya dicentang "Ada di Excel" = tidak (bisa difilter lewat "Tidak ada lagi di Excel" di halaman Koleksi).
 - Nama folder asli (kolom Berkas) hanya ada di Notion, tidak dikirim ke situs.
 
+### Jendela detail game (deskripsi, screenshot, system requirements)
+
+Klik kartu game untuk membuka jendela detail: banner, info (genre, developer, publisher, rilis, hardisk), tab Deskripsi, Screenshot (maksimal 5, bisa dibuka besar dan digeser dengan tombol panah) dan System Requirements (minimum dan disarankan). Tab yang datanya kosong disembunyikan. Data ini diambil dari Steam dan disimpan di kolom Notion `Banner`, `Screenshot`, `Publisher`, `Rilis`, `Tentang`, `Spek Minimum`, `Spek Disarankan`.
+
+- Game lama yang sudah punya Steam ID otomatis dilengkapi pada eksekusi berikutnya (hitungannya masuk batas 250 pencarian per eksekusi).
+- Jalankan workflow "Sinkron koleksi game" beberapa kali (Run workflow) sampai log tidak lagi menyebut sisa pencarian.
+- Game tanpa data: isi kolom `Steam ID` di Notion, lalu jalankan workflow.
+- Cover: kartu memakai cover potret; bila Steam tidak punya, otomatis memakai gambar lanskap. Cover kosong berarti judulnya belum dicari atau tidak ketemu, bukan karena bentuk gambarnya.
+
 ### Memperbaiki data yang salah atau kosong
 
 Buka baris itu di Notion. Cara paling mudah: isi **Steam ID** (angka di alamat toko Steam, `store.steampowered.com/app/ANGKA`), lalu sinkron berikutnya mengambil data yang benar. Untuk mengedit deskripsi atau cover sendiri, ubah lalu centang **Dikunci** supaya tidak ditimpa. Judul yang tidak ketemu otomatis bertanda Sumber = "Tidak ketemu".
