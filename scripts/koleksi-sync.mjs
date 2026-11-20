@@ -42,7 +42,7 @@ export function mirip(a, b) {
   return (2 * irisan) / (nA + nB);
 }
 // Angka dan seri harus sama: "Alan Wake 2" tidak boleh cocok dengan "Alan Wake".
-const angka = (s) => (normal(s).match(/\b(\d+|ii|iii|iv|vi|vii|viii|ix|x|xi|xii|xiii|xiv|xv|xvi)\b/g) || []).join(' ');
+const angka = (s) => (normal(s).replace(/\b(19|20)\d\d\b/g, ' ').match(/\b(\d+|ii|iii|iv|vi|vii|viii|ix|x|xi|xii|xiii|xiv|xv|xvi)\b/g) || []).join(' ');
 export const cocok = (cari, kandidat, batas = 0.8) => mirip(cari, kandidat) >= batas && angka(cari) === angka(kandidat);
 
 // ---------- Steam ----------
@@ -58,34 +58,72 @@ async function jsonDari(url, headers = {}) {
 const dekode = (s) => String(s || '').replace(/<[^>]+>/g, ' ').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#39;|&apos;/g, "'")
   .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
 
+// Teks syarat sistem dari HTML Steam ("<strong>OS:</strong> Windows 10<br>...") menjadi baris biasa.
+export function syaratTeks(html) {
+  const t = String(html || '').replace(/<br\s*\/?>|<\/li>|<\/p>|<\/ul>/gi, '\n').replace(/<li[^>]*>/gi, '');
+  return dekode(t.replace(/\n/g, '¶')).split('¶').map((x) => x.trim()).filter(Boolean)
+    .filter((x) => !/^(minimum|recommended|disarankan)\s*:?$/i.test(x)).join('\n').slice(0, 1900);
+}
+const tanpaT = (u) => String(u || '').split('?')[0];
+
+// Cover potret (600x900) hanya ada untuk sebagian game; sisanya memakai gambar lanskap dari Steam.
+async function potretAda(id) {
+  try {
+    const res = await fetch(`https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/library_600x900.jpg`, { method: 'HEAD', headers: { 'User-Agent': UA } });
+    return res.ok;
+  } catch { return false; }
+}
+
 export async function dataSteam(id) {
   const j = await jsonDari(`https://store.steampowered.com/api/appdetails?appids=${id}&cc=us&l=english`);
   const d = j?.[id]?.success ? j[id].data : null;
   if (!d) return null;
   const tahun = Number((String(d.release_date?.date || '').match(/\b(19|20)\d{2}\b/) || [])[0]) || null;
+  const banner = tanpaT(d.header_image) || `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/header.jpg`;
+  const potret = `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/library_600x900.jpg`;
+  const pendek = dekode(d.short_description || '');
+  const panjang = dekode(d.about_the_game || '');
+  const req = (x) => (x && !Array.isArray(x) ? x : {});
   return {
     sumber: 'Steam', steamId: Number(id), judul: d.name,
-    deskripsi: dekode(d.short_description || d.about_the_game || ''),
-    cover: `https://cdn.cloudflare.steamstatic.com/steam/apps/${id}/library_600x900.jpg`,
+    deskripsi: pendek || panjang,
+    tentang: panjang && panjang !== pendek ? potong(panjang, 1900) : '',
+    cover: (await potretAda(id)) ? potret : banner,
+    banner,
     tautan: `https://store.steampowered.com/app/${id}`,
     developer: (d.developers || []).join(', '),
+    publisher: (d.publishers || []).join(', '),
+    rilis: d.release_date?.coming_soon ? 'Segera rilis' : String(d.release_date?.date || ''),
     genre: (d.genres || []).map((g) => g.description).filter(Boolean).slice(0, 5),
+    screenshots: (d.screenshots || []).slice(0, 5).map((x) => tanpaT(x.path_full)).filter(Boolean),
+    spekMin: syaratTeks(req(d.pc_requirements).minimum),
+    spekRek: syaratTeks(req(d.pc_requirements).recommended),
     tahun,
   };
 }
 
+// Varian pencarian: judul penuh, lalu tanpa 1-4 kata di ujung (sisa nama grup/edisi). Varian yang dipangkas
+// harus sama persis (setelah dinormalkan) dengan nama di Steam, supaya "Grand Theft Auto" tidak jadi "Grand Theft Auto V".
+export function varianCari(judul) {
+  const kata = String(judul).replace(/[™®©℠]/g, '').split(/\s+/).filter(Boolean);
+  const out = [{ q: kata.join(' '), persis: false }];
+  for (let k = 1; k <= 4 && kata.length - k >= 2; k++) out.push({ q: kata.slice(0, kata.length - k).join(' '), persis: true });
+  return out;
+}
 export async function cariSteam(judul) {
-  const j = await jsonDari(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(judul)}&cc=us&l=english`);
-  const hasil = (j.items || []).filter((x) => x.type === 'app' || !x.type);
-  let terbaik = null, skor = 0;
-  for (const x of hasil) {
-    if (!cocok(judul, x.name)) continue;
-    const s = mirip(judul, x.name);
-    if (s > skor) { skor = s; terbaik = x; }
+  for (const [i, v] of varianCari(judul).entries()) {
+    if (i) await tidur(600);
+    const j = await jsonDari(`https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(v.q)}&cc=us&l=english`);
+    const hasil = (j.items || []).filter((x) => x.type === 'app' || !x.type);
+    let terbaik = null, skor = 0;
+    for (const x of hasil) {
+      if (v.persis ? normal(x.name) !== normal(v.q) : !cocok(v.q, x.name)) continue;
+      const s = mirip(v.q, x.name);
+      if (s > skor) { skor = s; terbaik = x; }
+    }
+    if (terbaik) { await tidur(900); return dataSteam(terbaik.id); }
   }
-  if (!terbaik) return null;
-  await tidur(900);
-  return dataSteam(terbaik.id);
+  return null;
 }
 
 // ---------- Wikipedia (cadangan, tanpa kunci) ----------
@@ -105,7 +143,7 @@ export async function cariWikipedia(judul) {
       deskripsi: dekode(p.extract),
       cover: p.thumbnail?.source ? p.thumbnail.source.split('?')[0] : null,
       tautan: 'https://en.wikipedia.org/wiki/' + encodeURIComponent(p.title.replace(/ /g, '_')).replace(/%28/g, '(').replace(/%29/g, ')'),
-      developer: '', genre: [],
+      developer: '', genre: [], banner: null, screenshots: [], spekMin: '', spekRek: '', publisher: '', rilis: '', tentang: '',
       tahun: Number((String(p.extract).match(/\b(19[89]\d|20[0-4]\d)\b/) || [])[0]) || null,
     };
   }
@@ -147,6 +185,7 @@ export function bacaHalaman(pg) {
     sumber: p['Sumber']?.select?.name || '',
     steamId: p['Steam ID']?.number ?? null,
     cover: p['Cover']?.url || '',
+    banner: p['Banner']?.url || '',
   };
 }
 
@@ -157,6 +196,9 @@ export function propsData(d) {
     Genre: { multi_select: (d.genre || []).map((n) => ({ name: n.replace(/,/g, ' ').slice(0, 100) })) },
     Tahun: { number: d.tahun || null }, Cover: { url: d.cover || null }, Tautan: { url: d.tautan || null },
     'Steam ID': { number: d.steamId || null }, Sumber: { select: { name: d.sumber } },
+    Banner: { url: d.banner || null }, Publisher: teks(potong(d.publisher, 300)), Rilis: teks(potong(d.rilis, 100)),
+    Tentang: teks(d.tentang), Screenshot: teks((d.screenshots || []).join('\n')),
+    'Spek Minimum': teks(d.spekMin), 'Spek Disarankan': teks(d.spekRek),
   };
 }
 
@@ -305,11 +347,15 @@ export async function jalankan(env, deps = {}) {
       // Perkaya ulang: belum pernah dicari, atau Steam ID diisi manual yang berbeda dari data tersimpan.
       const butuh = !pg.dikunci && pg.sumber !== 'Manual' && (!pg.sumber || (pg.sumber === 'Tidak ketemu' && env.ULANG_TIDAK_KETEMU === '1'));
       const idManual = !pg.dikunci && pg.steamId && pg.sumber !== 'Steam';
-      if ((butuh || idManual) && kuota > 0 && !g.tambahan) {
+      // Baris Steam dari versi lama belum punya banner, screenshot, dan spesifikasi: ambil ulang berdasarkan Steam ID yang sudah ada.
+      const segarkan = !pg.dikunci && pg.sumber === 'Steam' && pg.steamId && !pg.banner;
+      if ((butuh || idManual || segarkan) && kuota > 0 && !g.tambahan) {
         kuota--;
-        const data = idManual ? await ambilById(pg.steamId) : await cari(g.judul);
+        const data = (idManual || segarkan) ? await ambilById(pg.steamId) : await cari(g.judul);
         await tidur(deps.jeda ?? 900);
-        if (data) { Object.assign(props, propsData(data)); hasil.diperkaya++; }
+        if (data && segarkan) { Object.assign(props, propsData({ ...data, judul: '' })); hasil.disegarkan = (hasil.disegarkan || 0) + 1; }
+        else if (data) { Object.assign(props, propsData(data)); hasil.diperkaya++; }
+        else if (segarkan) { props.Banner = { url: pg.cover || null }; } // Steam sudah tidak menyediakan data: jangan diulang terus
         else { props.Sumber = { select: { name: 'Tidak ketemu' } }; hasil.tidakKetemu++; }
       }
       if (Object.keys(props).length) { await N(`/pages/${pg.id}`, { properties: props }, 'PATCH'); hasil.diperbarui++; await tidur(deps.jeda ?? 350); }
@@ -327,7 +373,7 @@ export async function jalankan(env, deps = {}) {
     try { await N(`/pages/${p.id}`, { properties: { 'Ada di Excel': { checkbox: false } } }, 'PATCH'); hasil.hilang++; await tidur(deps.jeda ?? 350); }
     catch (e) { hasil.galat.push(`${p.judul}: ${e.message}`); }
   }
-  log(`Selesai: ${hasil.baru} baru, ${hasil.diperbarui} diperbarui, ${hasil.diperkaya} diperkaya, ${hasil.tidakKetemu} tidak ketemu, ${hasil.hilang} tidak ada lagi di Excel, ${hasil.galat.length} galat.`);
+  log(`Selesai: ${hasil.baru} baru, ${hasil.diperbarui} diperbarui, ${hasil.diperkaya} diperkaya, ${hasil.tidakKetemu} tidak ketemu, ${hasil.hilang} tidak ada lagi di Excel, ${hasil.disegarkan || 0} disegarkan (banner, screenshot, spesifikasi), ${hasil.galat.length} galat.`);
   if (kuota <= 0) log(`Batas ${maks} pencarian data per eksekusi tercapai. Jalankan lagi untuk melanjutkan sisanya.`);
   return hasil;
 }
