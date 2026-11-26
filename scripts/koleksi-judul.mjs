@@ -11,7 +11,8 @@ export const normal = (s) => String(s || '').replace(/[™®©℠]/g, '').toLowe
 
 export function bersihJudul(raw) {
   let s = String(raw || '').trim();
-  const info = { update: false, tambahan: false, earlyAccess: false, edisi: '' };
+  const info = { update: false, tambahan: false, earlyAccess: false, edisi: '', tag: [] };
+  if (/hypervisor/i.test(s)) info.tag.push('Hypervisor');
   if (/^\[OPTIONAL\]/i.test(s) || /\b(modpack|mod pack|sideloader)\b/i.test(s)) info.tambahan = true;
   if (/early access/i.test(s)) info.earlyAccess = true;
   s = s.replace(/^\[[^\]]*\]\s*/, '').replace(/\[[^\]]*\]/g, ' ').replace(/\(\s*v?[\d.]+\s*\)/gi, ' ');
@@ -59,11 +60,12 @@ export function kelompokkan(entri) {
     const kunci = normal(b.judul) + (b.tambahan ? '|tambahan' : '');
     if (!normal(b.judul)) continue;
     let g = peta.get(kunci);
-    if (!g) { g = { kunci, judul: b.judul, edisi: new Set(), lokasi: new Set(), berkas: new Set(), tambahan: b.tambahan, earlyAccess: false, adaUpdate: false }; peta.set(kunci, g); }
+    if (!g) { g = { kunci, judul: b.judul, edisi: new Set(), lokasi: new Set(), berkas: new Set(), tambahan: b.tambahan, tag: new Set(), earlyAccess: false, adaUpdate: false }; peta.set(kunci, g); }
     if (b.edisi) g.edisi.add(b.edisi);
+    for (const t of b.tag) g.tag.add(t);
     g.lokasi.add(e.lokasi); g.berkas.add(e.raw);
     g.earlyAccess ||= b.earlyAccess; g.adaUpdate ||= b.update;
     if (b.judul.length > g.judul.length && normal(b.judul) === normal(g.judul)) g.judul = b.judul;
   }
-  return [...peta.values()].map((g) => ({ ...g, edisi: [...g.edisi].join(', '), lokasi: [...g.lokasi].sort(), berkas: [...g.berkas] }));
+  return [...peta.values()].map((g) => ({ ...g, edisi: [...g.edisi].join(', '), tag: [...g.tag].sort(), lokasi: [...g.lokasi].sort(), berkas: [...g.berkas] }));
 }
