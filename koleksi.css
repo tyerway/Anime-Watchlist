@@ -71,3 +71,5 @@ dialog.k-dlg::backdrop { background: rgba(5, 8, 15, .78); }
   .k-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 12px; }
   .k-post { padding: 16px 14px 22px; } .k-post h2 { padding-right: 0; margin-top: 30px; } .k-info2, .k-spek { grid-template-columns: 1fr; gap: 0 0; } .k-info2 dd { margin-bottom: 6px; } .k-shots { grid-template-columns: 1fr 1fr; } .k-tabs button { flex: 1 1 auto; padding: 9px 10px; font-size: .78rem; }
 }
+
+.k-hd.k-tag { border-color: #a78bfa; color: #ddd6fe; background: rgba(167,139,250,.14); }
