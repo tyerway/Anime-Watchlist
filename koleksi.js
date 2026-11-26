@@ -102,6 +102,7 @@
     const lokasiList = [...new Set(semua.flatMap((x) => x.lokasi))].sort();
     const genreList = [...new Set(semua.flatMap((x) => x.genre))].sort((a, b) => a.localeCompare(b));
     const hitung = (l) => semua.filter((x) => x.lokasi.includes(l)).length;
+    const tagList = [...new Set(semua.flatMap((x) => x.tag || []))].sort();
     const belumData = semua.filter((x) => !x.sumber || x.sumber === 'Tidak ketemu').length;
 
     const q = h('input', { type: 'search', 'aria-label': 'Cari judul', placeholder: 'Cari judul, developer, genre…', autocomplete: 'off' });
@@ -109,7 +110,8 @@
     const uSel = h('select', { 'aria-label': 'Urutkan' },
       h('option', { value: 'az', text: 'A–Z' }), h('option', { value: 'tahun', text: 'Tahun terbaru' }), h('option', { value: 'baru', text: 'Terakhir ditambahkan' }));
     const dSel = h('select', { 'aria-label': 'Kelengkapan data' }, h('option', { value: 'semua', text: 'Semua data' }),
-      h('option', { value: 'belum', text: `Belum ada data (${belumData})` }), h('option', { value: 'hilang', text: 'Tidak ada lagi di Excel' }));
+      h('option', { value: 'belum', text: `Belum ada data (${belumData})` }), h('option', { value: 'hilang', text: 'Tidak ada lagi di Excel' }),
+      tagList.map((t) => h('option', { value: 'tag:' + t, text: `Tag: ${t} (${semua.filter((x) => (x.tag || []).includes(t)).length})` })));
     const chipBox = h('div', { class: 'k-chips', role: 'group', 'aria-label': 'Hardisk' });
     const info = h('p', { class: 'k-info', 'aria-live': 'polite' });
     const grid = h('ul', { class: 'k-grid' });
@@ -128,7 +130,7 @@
       let r = semua.filter((x) =>
         (f.lokasi === 'semua' || x.lokasi.includes(f.lokasi)) &&
         (!f.genre || x.genre.includes(f.genre)) &&
-        (f.data === 'semua' || (f.data === 'belum' ? (!x.sumber || x.sumber === 'Tidak ketemu') : !x.adaDiExcel)) &&
+        (f.data === 'semua' || (f.data.startsWith('tag:') ? (x.tag || []).includes(f.data.slice(4)) : f.data === 'belum' ? (!x.sumber || x.sumber === 'Tidak ketemu') : !x.adaDiExcel)) &&
         (!kata || `${x.judul} ${x.developer} ${x.genre.join(' ')} ${x.edisi}`.toLowerCase().includes(kata)));
       if (f.urut === 'tahun') r = r.slice().sort((a, b) => (b.tahun || 0) - (a.tahun || 0) || a.judul.localeCompare(b.judul));
       else if (f.urut === 'baru') r = r.slice().sort((a, b) => String(b.ditambahkan).localeCompare(String(a.ditambahkan)));
@@ -145,13 +147,13 @@
         gambar(x),
         h('div', { class: 'k-meta' }, h('b', { text: x.judul }),
           h('span', { class: 'k-sub1', title: x.developer || null, text: [x.tahun, ringkasDev(x.developer)].filter(Boolean).join(' · ') || '\u00a0' }),
-          h('div', { class: 'k-hds' }, x.lokasi.map((l) => h('span', { class: 'k-hd', text: l }))))))));
+          h('div', { class: 'k-hds' }, [...(x.tag || []).map((t) => h('span', { class: 'k-hd k-tag', text: t })), ...x.lokasi.map((l) => h('span', { class: 'k-hd', text: l }))]))))));
       lagi.hidden = r.length <= f.tampil;
     }
 
     function detail(x) {
       const info = [['Judul', x.edisi ? `${x.judul} (${x.edisi})` : x.judul], ['Genre', x.genre.join(', ')], ['Developer', x.developer], ['Publisher', x.publisher],
-        ['Tanggal rilis', x.rilis || x.tahun], ['Hardisk', x.lokasi.join(', ')], ['Sumber data', x.sumber === 'Tidak ketemu' ? 'Belum ketemu otomatis' : x.sumber], ['Catatan', x.catatan]].filter(([, v]) => v);
+        ['Tanggal rilis', x.rilis || x.tahun], ['Tag', (x.tag || []).join(', ')], ['Hardisk', x.lokasi.join(', ')], ['Sumber data', x.sumber === 'Tidak ketemu' ? 'Belum ketemu otomatis' : x.sumber], ['Catatan', x.catatan]].filter(([, v]) => v);
       const bannerUrl = x.banner || x.cover;
       const banner = bannerUrl ? h('img', { class: 'k-banner', alt: '', decoding: 'async', src: coverSrc(bannerUrl) }) : null;
       if (banner) banner.addEventListener('error', () => banner.remove());
