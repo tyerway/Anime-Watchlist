@@ -180,6 +180,7 @@ export function bacaHalaman(pg) {
     berkas: plain(p['Berkas']?.rich_text).split('\n').map((x) => x.trim()).filter(Boolean),
     lokasi: (p['Lokasi']?.multi_select || []).map((o) => o.name).sort(),
     edisi: plain(p['Edisi']?.rich_text),
+    tag: (p['Tag']?.multi_select || []).map((o) => o.name).sort(),
     adaDiExcel: !!p['Ada di Excel']?.checkbox,
     dikunci: !!p['Dikunci']?.checkbox,
     sumber: p['Sumber']?.select?.name || '',
@@ -324,7 +325,7 @@ export async function jalankan(env, deps = {}) {
       let pg = g.berkas.map((b) => dariBerkas.get(b)).find(Boolean) || dariJudul.get(normal(g.judul));
       const dasar = {
         Lokasi: { multi_select: g.lokasi.map((name) => ({ name })) },
-        Edisi: teks(g.edisi), Berkas: teks(g.berkas.join('\n')), 'Ada di Excel': { checkbox: true },
+        Edisi: teks(g.edisi), Tag: { multi_select: g.tag.map((name) => ({ name })) }, Berkas: teks(g.berkas.join('\n')), 'Ada di Excel': { checkbox: true },
         ...(g.tambahan ? { Catatan: teks('Paket tambahan / mod') } : {}),
       };
       if (!pg) {
@@ -342,6 +343,7 @@ export async function jalankan(env, deps = {}) {
       const props = {};
       if (pg.lokasi.join('|') !== g.lokasi.join('|')) props.Lokasi = dasar.Lokasi;
       if (pg.edisi !== g.edisi) props.Edisi = dasar.Edisi;
+      if (pg.tag.join('|') !== g.tag.join('|')) props.Tag = dasar.Tag;
       if (pg.berkas.join('\n') !== g.berkas.join('\n')) props.Berkas = dasar.Berkas;
       if (!pg.adaDiExcel) props['Ada di Excel'] = dasar['Ada di Excel'];
       // Perkaya ulang: belum pernah dicari, atau Steam ID diisi manual yang berbeda dari data tersimpan.
