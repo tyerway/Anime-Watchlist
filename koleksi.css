@@ -63,9 +63,8 @@ dialog.k-dlg::backdrop { background: rgba(5, 8, 15, .78); }
 .k-vcount { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); color: var(--muted); font-size: .9rem; }
 .k-vbtn { position: absolute; width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--line); background: rgba(16, 20, 31, .85); color: var(--text); font-size: 1.5rem; line-height: 1; cursor: pointer; }
 .k-vbtn:hover { border-color: var(--k-aksen); } .k-vprev { left: 14px; top: 50%; } .k-vnext { right: 14px; top: 50%; } .k-vclose { top: 14px; right: 14px; font-size: 1.1rem; }
-.k-cover.lanskap { background: var(--ink); }
-.k-cover.lanskap::before { content: ''; position: absolute; inset: -12px; background: var(--bg) center / cover; filter: blur(14px) brightness(.55); }
-.k-cover.lanskap img { position: relative; object-fit: contain; height: auto; top: 50%; transform: translateY(-50%); }
+/* Gambar lanskap mengisi penuh area cover kartu (tepi kiri dan kanan terpotong); jendela detail tidak terpengaruh. */
+.k-cover.lanskap img { object-fit: cover; object-position: center; }
 @media (max-width: 640px) {
   .k-tools { grid-template-columns: 1fr 1fr; } .k-tools input { grid-column: 1 / -1; }
   .k-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); gap: 12px; }
